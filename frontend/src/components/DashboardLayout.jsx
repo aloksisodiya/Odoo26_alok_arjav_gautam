@@ -19,6 +19,8 @@ import {
   Clock,
   Bell,
   CheckCircle,
+  Menu,
+  X,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -34,6 +36,12 @@ const DashboardLayout = ({ children }) => {
   const [showWarning, setShowWarning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(30);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on navigation
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   // Active alerts query
   const { data: alerts, refetch: refetchAlerts } = useQuery({
@@ -236,18 +244,18 @@ const DashboardLayout = ({ children }) => {
   const navLinks = getNavLinks();
 
   return (
-    <div className="min-h-screen bg-dark-bg text-gray-200 flex flex-col font-sans">
+    <div className="h-screen bg-dark-bg text-gray-200 flex flex-col font-sans overflow-hidden">
       {/* INACTIVITY WARNING MODAL */}
       {showWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-dark-surface border border-brand/50 p-6 rounded-lg max-w-sm w-full shadow-2xl text-center">
             <Clock className="w-12 h-12 text-brand mx-auto mb-4 animate-pulse" />
-            <h3 className="text-lg font-bold text-white font-mono uppercase tracking-wide mb-2">
+            <h3 className="text-lg font-bold text-white font-sans uppercase tracking-wide mb-2">
               Inactivity Warning
             </h3>
             <p className="text-xs text-gray-400 mb-6 leading-relaxed">
               Your session will terminate due to inactivity in{" "}
-              <span className="font-mono text-brand font-bold text-sm">
+              <span className="font-sans text-brand font-bold text-sm">
                 {secondsRemaining}
               </span>{" "}
               seconds.
@@ -265,11 +273,18 @@ const DashboardLayout = ({ children }) => {
       )}
 
       {/* TOP BAR */}
-      <header className="h-16 bg-dark-surface border-b border-dark-border px-6 flex items-center justify-between z-10">
-        {/* Left Side: Logo */}
+      <header className="sticky top-0 z-[60] h-16 bg-dark-surface/90 backdrop-blur-md border-b border-dark-border px-6 flex items-center justify-between">
+        {/* Left Side: Logo & Mobile Menu Toggle */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 -ml-2 text-gray-400 hover:text-white md:hidden focus:outline-none transition-colors rounded hover:bg-dark-hoverBg"
+            aria-label="Toggle Menu"
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
           <img src="/logo.png" alt="TransitOps Logo" className="w-8 h-8 object-contain rounded" />
-          <span className="text-lg font-bold text-white font-mono tracking-tight">
+          <span className="text-lg font-bold text-white font-sans tracking-tight">
             TransitOps
           </span>
         </div>
@@ -328,10 +343,10 @@ const DashboardLayout = ({ children }) => {
 
           <ThemeToggle className="hidden sm:inline-flex" />
           <div className="hidden lg:flex flex-col items-end border-r border-dark-border/40 pr-6">
-            <span className="text-[10px] text-brand font-mono font-bold uppercase tracking-wider">
+            <span className="text-[10px] text-brand font-sans font-bold uppercase tracking-wider">
               Operational Session
             </span>
-            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-mono mt-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-sans mt-0.5">
               <span>Last login:</span>
               <span className="text-gray-300 font-medium">
                 {formatLastLogin(user.lastLogin)}
@@ -342,7 +357,7 @@ const DashboardLayout = ({ children }) => {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-xs font-semibold text-white">{user.name}</p>
-              <span className="inline-block bg-brand/10 text-brand border border-brand/20 text-[10px] px-2 py-0.5 rounded font-mono font-medium mt-0.5 uppercase">
+              <span className="inline-block bg-brand/10 text-brand border border-brand/20 text-[10px] px-2 py-0.5 rounded font-sans font-medium mt-0.5 uppercase">
                 {user.role.replace(/([A-Z])/g, " $1").trim()}
               </span>
             </div>
@@ -361,13 +376,69 @@ const DashboardLayout = ({ children }) => {
         </div>
       </header>
 
+      {/* MOBILE DRAWER OVERLAY */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[50] md:hidden">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          {/* Drawer Panel */}
+          <aside className="fixed top-16 left-0 bottom-0 w-64 bg-theme-panel-alt border-r border-dark-border p-5 flex flex-col justify-between z-10 animate-slide-in-left shadow-2xl">
+            <div className="space-y-6">
+              <div>
+                <span className="text-xs text-gray-500 font-sans font-bold uppercase tracking-wider pl-3">
+                  Authorized Modules
+                </span>
+                <nav className="mt-4 space-y-2">
+                  {navLinks.map((link, index) => {
+                    const Icon = link.icon;
+                    const isActive = location.pathname === link.path;
+                    return (
+                      <Link
+                        key={index}
+                        to={link.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`flex items-center gap-3.5 px-3.5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? "bg-brand/10 border-l-4 border-brand text-white"
+                            : "text-gray-400 hover:text-white hover:bg-dark-surface/40"
+                        }`}
+                      >
+                        <Icon
+                          className={`w-5 h-5 transition-transform duration-200 ${isActive ? "text-brand scale-110" : ""}`}
+                        />
+                        {link.name}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+            </div>
+
+            <div className="p-4 bg-dark-surface/20 border border-dark-border/40 rounded-xl text-center">
+              <span className="text-xs text-gray-500 font-sans font-bold uppercase tracking-wider block">
+                DEPOT OPERATIONAL STATUS
+              </span>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="text-xs text-gray-400 font-sans">
+                  DEPOT ACTIVE (127.0.0.1)
+                </span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* BODY WORKSPACE */}
       <div className="flex-1 flex overflow-hidden">
         {/* SIDEBAR NAVIGATION */}
         <aside className="w-64 bg-theme-panel-alt border-r border-dark-border p-5 flex flex-col justify-between hidden md:flex">
           <div className="space-y-6">
             <div>
-              <span className="text-xs text-gray-500 font-mono font-bold uppercase tracking-wider pl-3">
+              <span className="text-xs text-gray-500 font-sans font-bold uppercase tracking-wider pl-3">
                 Authorized Modules
               </span>
               <nav className="mt-4 space-y-2">
@@ -396,12 +467,12 @@ const DashboardLayout = ({ children }) => {
           </div>
 
           <div className="p-4 bg-dark-surface/20 border border-dark-border/40 rounded-xl text-center">
-            <span className="text-xs text-gray-500 font-mono font-bold uppercase tracking-wider block">
+            <span className="text-xs text-gray-500 font-sans font-bold uppercase tracking-wider block">
               DEPOT OPERATIONAL STATUS
             </span>
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-xs text-gray-400 font-mono">
+              <span className="text-xs text-gray-400 font-sans">
                 DEPOT ACTIVE (127.0.0.1)
               </span>
             </div>
@@ -410,22 +481,6 @@ const DashboardLayout = ({ children }) => {
 
         {/* PAGE CONTENT CONTAINER */}
         <main className="flex-1 bg-dark-bg p-6 overflow-y-auto relative">
-          {/* Mobile warning header if window is too small */}
-          <div className="md:hidden mb-4 bg-dark-surface border border-dark-border p-3 rounded flex items-center justify-between text-xs">
-            <span className="font-mono text-brand">Mobile Ops Mode</span>
-            <div className="flex gap-2">
-              {navLinks.map((link, index) => (
-                <Link
-                  key={index}
-                  to={link.path}
-                  className="text-gray-400 hover:text-white underline"
-                >
-                  {link.name.split(" ")[0]}
-                </Link>
-              ))}
-            </div>
-          </div>
-
           {children}
         </main>
       </div>

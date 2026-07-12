@@ -39,7 +39,7 @@ const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
   <div className="bg-dark-surface border border-dark-border p-5 rounded shadow hover:border-brand/40 transition-colors">
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-[10px] text-gray-500 font-mono font-bold uppercase tracking-wider">
+        <p className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider">
           {title}
         </p>
         <h4 className="text-2xl font-bold mt-1.5 technical-mono text-white">
@@ -145,10 +145,10 @@ export const DispatcherDashboard = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-mono tracking-tight text-theme-text uppercase">
+          <h2 className="text-2xl font-bold text-theme-text tracking-tight uppercase">
             Dispatch Operations Centre
           </h2>
-          <p className="text-xs text-theme-muted mt-1 font-mono">
+          <p className="text-sm text-theme-muted mt-1">
             Real-time database feed of active dispatches, driver rosters, and fleet metrics.
           </p>
         </div>
@@ -168,62 +168,62 @@ export const DispatcherDashboard = () => {
         </div>
       </div>
 
-      {/* METRIC GRID (7 Cards Side by Side) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-blue-500">
+      {/* METRIC GRID (7 Cards Side by Side, responsive wrapping) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-blue-500 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Active Vehicles</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.activeVehicles).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Active Vehicles</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.activeVehicles).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">In transit en route</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">In transit en route</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-green-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-green-500 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Available</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.availableVehicles).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Available</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.availableVehicles).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">In depot ready</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">In depot ready</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-amber-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-amber-500 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">In Shop</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.vehiclesInMaintenance).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">In Shop</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.vehiclesInMaintenance).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Maintenance status</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">Maintenance status</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-indigo-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-indigo-500 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Active Trips</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.activeTrips).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Active Trips</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.activeTrips).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Dispatched trips</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">Dispatched trips</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-sky-400">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-sky-400 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Pending Trips</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.pendingTrips).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Pending Trips</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.pendingTrips).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Draft queues</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">Draft queues</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-gray-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-gray-500 hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Drivers Duty</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.driversOnDuty).padStart(2, '0')}</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Drivers Duty</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{String(metrics.driversOnDuty).padStart(2, '0')}</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">On-road drivers</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">On-road drivers</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-brand">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-brand hover:border-brand/40 transition-colors">
           <div>
-            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Utilization</span>
-            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{metrics.fleetUtilization}%</span>
+            <span className="text-xs text-theme-muted font-sans font-semibold uppercase tracking-wider block">Utilization</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{metrics.fleetUtilization}%</span>
           </div>
-          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Operational ratio</span>
+          <span className="text-xs text-theme-muted mt-2 block leading-none">Operational ratio</span>
         </div>
       </div>
 
@@ -1039,8 +1039,8 @@ export const TripsManager = () => {
   return (
     <div className="space-y-6 text-theme-text">
       <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Trip Dispatcher</h2>
-        <p className="text-xs text-theme-muted mt-1 font-mono">Create, dispatch, and manage active operational dispatches.</p>
+        <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Trip Dispatcher</h2>
+        <p className="text-sm text-theme-muted mt-1">Create, dispatch, and manage active operational dispatches.</p>
       </div>
 
       {errorMsg && (
@@ -1704,8 +1704,8 @@ export const FleetRegistry = () => {
       {/* Header & Add Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Vehicle Registry</h2>
-          <p className="text-xs text-theme-muted mt-1 font-mono">Manage and track company transportation assets.</p>
+          <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Vehicle Registry</h2>
+          <p className="text-sm text-theme-muted mt-1">Manage and track company transportation assets.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -2196,8 +2196,8 @@ export const MaintenanceLogs = () => {
   return (
     <div className="space-y-6 text-theme-text">
       <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Maintenance Scheduler</h2>
-        <p className="text-xs text-theme-muted mt-1 font-mono">Open service tickets and track vehicle repair workshops.</p>
+        <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Maintenance Scheduler</h2>
+        <p className="text-sm text-theme-muted mt-1">Open service tickets and track vehicle repair workshops.</p>
       </div>
 
       {errorMsg && (
@@ -2543,8 +2543,8 @@ export const DriverRegistry = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-mono uppercase tracking-tight font-sans">Drivers & Safety Profiles</h2>
-          <p className="text-xs text-theme-muted mt-1 font-mono">Driver licensing, safety scores, and rosters tracking.</p>
+          <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Drivers & Safety Profiles</h2>
+          <p className="text-sm text-theme-muted mt-1">Driver licensing, safety scores, and rosters tracking.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -2891,42 +2891,42 @@ export const ComplianceLogs = () => {
   );
 
   return (
-    <div className="space-y-6 text-theme-text font-mono text-xs">
+    <div className="space-y-6 text-theme-text text-sm">
       <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Compliance & Safety Engine</h2>
-        <p className="text-[10px] text-theme-muted mt-1 font-mono">Auto-generated audit reports, driver credentials monitoring, and asset waiver flags.</p>
+        <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Compliance & Safety Engine</h2>
+        <p className="text-sm text-theme-muted mt-1">Auto-generated audit reports, driver credentials monitoring, and asset waiver flags.</p>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Compliance Index</span>
-          <span className={`text-2xl font-bold block mt-1 ${totalComplianceScore > 80 ? 'text-green-400' : totalComplianceScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>{totalComplianceScore}%</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Overall fleet status score</span>
+      {/* Overview Cards (Responsive Grid) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Compliance Index</span>
+          <span className={`text-2xl font-bold block mt-1 font-mono ${totalComplianceScore > 80 ? 'text-green-400' : totalComplianceScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>{totalComplianceScore}%</span>
+          <span className="text-xs text-theme-muted block mt-2">Overall fleet status score</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-red-500">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expired Licenses</span>
-          <span className="text-2xl font-bold block mt-1 text-red-400">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-red-500 hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Expired Licenses</span>
+          <span className="text-2xl font-bold block mt-1 text-red-400 font-mono">
             {expiredDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
           </span>
-          <span className="text-[8px] text-theme-muted block mt-2">Active blocked dispatches</span>
+          <span className="text-xs text-theme-muted block mt-2">Active blocked dispatches</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-amber-500">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expiring Licenses</span>
-          <span className="text-2xl font-bold block mt-1 text-amber-400">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-amber-500 hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Expiring Licenses</span>
+          <span className="text-2xl font-bold block mt-1 text-amber-400 font-mono">
             {expiringSoonDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
           </span>
-          <span className="text-[8px] text-theme-muted block mt-2">Expires within 30 days</span>
+          <span className="text-xs text-theme-muted block mt-2">Expires within 30 days</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-brand">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Critical Safety</span>
-          <span className="text-2xl font-bold block mt-1 text-brand">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-brand hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Critical Safety</span>
+          <span className="text-2xl font-bold block mt-1 text-brand font-mono">
             {lowSafetyDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
           </span>
-          <span className="text-[8px] text-theme-muted block mt-2">Safety Score &lt; 85%</span>
+          <span className="text-xs text-theme-muted block mt-2">Safety Score &lt; 85%</span>
         </div>
       </div>
 
@@ -3292,11 +3292,11 @@ export const FuelExpenses = () => {
   };
 
   return (
-    <div className="space-y-6 text-theme-text font-mono text-xs">
+    <div className="space-y-6 text-theme-text text-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Fuel & Expense Management</h2>
-          <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Log vehicle fuel inputs, tolls, maintenance costs, and aggregate operations expenses.</p>
+          <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Fuel & Expense Management</h2>
+          <p className="text-sm text-theme-muted mt-1">Log vehicle fuel inputs, tolls, maintenance costs, and aggregate operations expenses.</p>
         </div>
         <button
           onClick={handleExportFinancialReportPDF}
@@ -3694,11 +3694,11 @@ export const AnalyticsDashboard = () => {
   };
 
   return (
-    <div className="space-y-6 text-theme-text font-mono text-xs">
+    <div className="space-y-6 text-theme-text text-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Reports & Analytics</h2>
-          <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Operational efficiency, fleet yields, and costs tracking ledger.</p>
+          <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Reports & Analytics</h2>
+          <p className="text-sm text-theme-muted mt-1">Operational efficiency, fleet yields, and costs tracking ledger.</p>
         </div>
         <button
           onClick={handleExportOperationalReport}
@@ -3708,34 +3708,34 @@ export const AnalyticsDashboard = () => {
         </button>
       </div>
 
-      {/* Grid of stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Fuel Efficiency</span>
-          <span className="text-2xl font-bold block mt-1">8.4 km/l</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Avg across active dispatches</span>
+      {/* Grid of stats (Responsive Grid) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Fuel Efficiency</span>
+          <span className="text-2xl font-bold block mt-1 font-mono text-white">8.4 km/l</span>
+          <span className="text-xs text-theme-muted block mt-2">Avg across active dispatches</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-green-500">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Fleet Utilization</span>
-          <span className="text-2xl font-bold block mt-1">{utilization}%</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Active dispatches ratio</span>
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-green-500 hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Fleet Utilization</span>
+          <span className="text-2xl font-bold block mt-1 font-mono text-white">{utilization}%</span>
+          <span className="text-xs text-theme-muted block mt-2">Active dispatches ratio</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-amber-500">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Operational Cost</span>
-          <span className="text-2xl font-bold block mt-1">₹{Number(opCost).toLocaleString()}</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Sum of fuel + maintenance + tolls</span>
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-amber-500 hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Operational Cost</span>
+          <span className="text-2xl font-bold block mt-1 font-mono text-white">₹{Number(opCost).toLocaleString()}</span>
+          <span className="text-xs text-theme-muted block mt-2">Sum of fuel + maintenance + tolls</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-brand">
-          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Vehicle ROI</span>
-          <span className="text-2xl font-bold block mt-1">14.2%</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Annualized yield index</span>
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-brand hover:border-brand/40 transition-colors">
+          <span className="text-xs text-theme-muted font-sans font-semibold block uppercase tracking-wider">Vehicle ROI</span>
+          <span className="text-2xl font-bold block mt-1 font-mono text-white">14.2%</span>
+          <span className="text-xs text-theme-muted block mt-2">Annualized yield index</span>
         </div>
       </div>
 
-      <div className="text-[9px] text-theme-muted uppercase tracking-wider text-center mt-2 border-b border-dark-border/40 pb-4 font-semibold">
+      <div className="text-xs text-theme-muted uppercase tracking-wider text-center mt-2 border-b border-dark-border/40 pb-4 font-semibold">
         ROI = (Revenue - (Maintenance + Fuel)) / Acquisition Cost
       </div>
 
@@ -3820,10 +3820,10 @@ export const SystemSettings = () => {
   };
 
   return (
-    <div className="space-y-6 text-theme-text font-mono text-xs">
+    <div className="space-y-6 text-theme-text text-sm">
       <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Settings & RBAC</h2>
-        <p className="text-[10px] text-theme-muted mt-1 font-mono">Configure global transport operations parameters and role permissions registry.</p>
+        <h2 className="text-2xl font-bold text-theme-text uppercase tracking-tight">Settings & RBAC</h2>
+        <p className="text-sm text-theme-muted mt-1">Configure global transport operations parameters and role permissions registry.</p>
       </div>
 
       {success && (
