@@ -16,10 +16,10 @@ const seedUsers = [
     role: 'FleetManager',
   },
   {
-    name: 'Arjav Driver',
+    name: 'Arjav Dispatcher',
     email: 'driver@transitops.com',
     password: 'Password123',
-    role: 'Driver',
+    role: 'Dispatcher',
   },
   {
     name: 'Gautam Safety Officer',
@@ -42,21 +42,21 @@ const seedUsers = [
 ];
 
 const seedVehicles = [
-  { registrationNo: 'VAN-05', name: 'Ford Transit VAN-05', type: 'Van', capacityKg: 1500, odometerKm: 45000, acquisitionCost: 35000, status: 'OnTrip' },
-  { registrationNo: 'TRK-12', name: 'Volvo FH16 TRK-12', type: 'Truck', capacityKg: 20000, odometerKm: 120000, acquisitionCost: 110000, status: 'Available' },
-  { registrationNo: 'MINI-08', name: 'Tata Ace MINI-08', type: 'Mini', capacityKg: 800, odometerKm: 15000, acquisitionCost: 12000, status: 'OnTrip' },
-  { registrationNo: 'TRK-15', name: 'Scania R500 TRK-15', type: 'Truck', capacityKg: 22000, odometerKm: 85000, acquisitionCost: 125000, status: 'InShop' },
-  { registrationNo: 'VAN-09', name: 'Mercedes Sprinter VAN-09', type: 'Van', capacityKg: 1800, odometerKm: 60000, acquisitionCost: 40000, status: 'Retired' },
-  { registrationNo: 'FLT-02', name: 'Isuzu NPR Flatbed', type: 'Flatbed', capacityKg: 5000, odometerKm: 32000, acquisitionCost: 48000, status: 'Available' },
-  { registrationNo: 'CNT-01', name: 'BharatBenz Container', type: 'Container', capacityKg: 15000, odometerKm: 98000, acquisitionCost: 85000, status: 'Available' }
+  { registrationNo: 'GJ-01-ET-0495', name: 'Tata Winger WNG-05', type: 'Van', capacityKg: 1500, odometerKm: 45000, acquisitionCost: 35000, status: 'OnTrip' },
+  { registrationNo: 'GJ-03-TR-8812', name: 'Ashok Leyland 3118', type: 'Truck', capacityKg: 20000, odometerKm: 120000, acquisitionCost: 110000, status: 'Available' },
+  { registrationNo: 'GJ-01-TA-7708', name: 'Tata Ace Gold MINI-08', type: 'Mini', capacityKg: 800, odometerKm: 15000, acquisitionCost: 12000, status: 'OnTrip' },
+  { registrationNo: 'MH-12-TR-9915', name: 'BharatBenz 2823C', type: 'Truck', capacityKg: 22000, odometerKm: 85000, acquisitionCost: 125000, status: 'InShop' },
+  { registrationNo: 'GJ-01-MB-4009', name: 'Force Traveller WNG-09', type: 'Van', capacityKg: 1800, odometerKm: 60000, acquisitionCost: 40000, status: 'Retired' },
+  { registrationNo: 'GJ-01-FL-5502', name: 'Mahindra Bolero Pickup', type: 'Flatbed', capacityKg: 5000, odometerKm: 32000, acquisitionCost: 48000, status: 'Available' },
+  { registrationNo: 'GJ-01-BB-8501', name: 'Eicher Pro 6028 Container', type: 'Container', capacityKg: 15000, odometerKm: 98000, acquisitionCost: 85000, status: 'Available' }
 ];
 
 const seedDrivers = [
-  { name: 'Alex Mercer', licenseNo: 'DL-552918', licenseCategory: 'LMV', licenseExpiry: new Date('2028-12-31'), contact: '+1 (555) 019-2831', tripCompletionPct: 95, safetyScore: 98, status: 'OnTrip' },
-  { name: 'John Doe', licenseNo: 'DL-902183', licenseCategory: 'HMV', licenseExpiry: new Date('2027-06-15'), contact: '+1 (555) 012-9988', tripCompletionPct: 88, safetyScore: 92, status: 'Available' },
+  { name: 'Aarav Patel', licenseNo: 'DL-552918', licenseCategory: 'LMV', licenseExpiry: new Date('2028-12-31'), contact: '+91 98765 01234', tripCompletionPct: 95, safetyScore: 98, status: 'OnTrip' },
+  { name: 'Rajesh Kumar', licenseNo: 'DL-902183', licenseCategory: 'HMV', licenseExpiry: new Date('2027-06-15'), contact: '+91 91234 56789', tripCompletionPct: 88, safetyScore: 92, status: 'Available' },
   { name: 'Priya Sharma', licenseNo: 'DL-223190', licenseCategory: 'LMV', licenseExpiry: new Date('2029-03-20'), contact: '+91 98765 43210', tripCompletionPct: 97, safetyScore: 99, status: 'OnTrip' },
-  { name: 'David Miller', licenseNo: 'DL-448192', licenseCategory: 'HMV', licenseExpiry: new Date('2026-11-30'), contact: '+1 (555) 017-4831', tripCompletionPct: 91, safetyScore: 85, status: 'OffDuty' },
-  { name: 'Robert Chen', licenseNo: 'DL-112288', licenseCategory: 'HMV', licenseExpiry: new Date('2025-05-10'), contact: '+1 (555) 015-8811', tripCompletionPct: 75, safetyScore: 68, status: 'Suspended' }
+  { name: 'Vikram Singh', licenseNo: 'DL-448192', licenseCategory: 'HMV', licenseExpiry: new Date('2026-11-30'), contact: '+91 93456 78901', tripCompletionPct: 91, safetyScore: 85, status: 'OffDuty' },
+  { name: 'Amit Sharma', licenseNo: 'DL-112288', licenseCategory: 'HMV', licenseExpiry: new Date('2025-05-10'), contact: '+91 95678 90123', tripCompletionPct: 75, safetyScore: 68, status: 'Suspended' }
 ];
 
 const runSeed = async () => {
@@ -96,12 +96,12 @@ const runSeed = async () => {
     console.log(`Created ${createdDrivers.length} drivers.`);
 
     // Find indices for referencing
-    const van = createdVehicles.find(v => v.registrationNo === 'VAN-05');
-    const trk = createdVehicles.find(v => v.registrationNo === 'TRK-12');
-    const mini = createdVehicles.find(v => v.registrationNo === 'MINI-08');
+    const van = createdVehicles.find(v => v.registrationNo === 'GJ-01-ET-0495');
+    const trk = createdVehicles.find(v => v.registrationNo === 'GJ-03-TR-8812');
+    const mini = createdVehicles.find(v => v.registrationNo === 'GJ-01-TA-7708');
 
-    const alex = createdDrivers.find(d => d.name === 'Alex Mercer');
-    const john = createdDrivers.find(d => d.name === 'John Doe');
+    const alex = createdDrivers.find(d => d.name === 'Aarav Patel');
+    const john = createdDrivers.find(d => d.name === 'Rajesh Kumar');
     const priya = createdDrivers.find(d => d.name === 'Priya Sharma');
 
     const seedTrips = [
