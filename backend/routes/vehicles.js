@@ -55,4 +55,63 @@ router.post('/', protect, authorize('FleetManager'), async (req, res) => {
   }
 });
 
+// @desc    Add a document to a vehicle
+// @route   POST /api/vehicles/:id/documents
+// @access  Private (FleetManager only)
+router.post('/:id/documents', protect, authorize('FleetManager'), async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const { name, type, documentNo, issueDate, expiryDate, notes } = req.body;
+
+    if (!name || !type) {
+      return res.status(400).json({ success: false, message: 'Document name and type are required' });
+    }
+
+    vehicle.documents.push({
+      name,
+      type,
+      documentNo: documentNo || '',
+      issueDate: issueDate || null,
+      expiryDate: expiryDate || null,
+      notes: notes || ''
+    });
+
+    await vehicle.save();
+
+    res.status(201).json({ success: true, data: vehicle });
+  } catch (error) {
+    console.error('Error adding document:', error);
+    res.status(500).json({ success: false, message: 'Server error adding document' });
+  }
+});
+
+// @desc    Delete a document from a vehicle
+// @route   DELETE /api/vehicles/:id/documents/:docId
+// @access  Private (FleetManager only)
+router.delete('/:id/documents/:docId', protect, authorize('FleetManager'), async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const docIndex = vehicle.documents.findIndex(d => d._id.toString() === req.params.docId);
+    if (docIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    vehicle.documents.splice(docIndex, 1);
+    await vehicle.save();
+
+    res.json({ success: true, data: vehicle });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    res.status(500).json({ success: false, message: 'Server error deleting document' });
+  }
+});
+
 module.exports = router;

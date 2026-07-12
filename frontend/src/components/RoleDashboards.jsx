@@ -4,6 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Legend
+} from "recharts";
 import { jsPDF } from "jspdf";
 import {
   Truck,
@@ -22,7 +26,12 @@ import {
   Calendar,
   FileCheck,
   Download,
-  Play
+  Play,
+  ArrowUpDown,
+  Trash2,
+  FolderOpen,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
@@ -44,12 +53,34 @@ const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
   </div>
 );
 
-// 1. Dispatcher default: Dashboard
+const CHART_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
+
+const SortableHeader = ({ label, sortKey, sortConfig, onSort, className = "" }) => (
+  <th
+    className={`py-2.5 cursor-pointer select-none hover:text-white transition-colors group ${className}`}
+    onClick={() => onSort(sortKey)}
+  >
+    <span className="inline-flex items-center gap-1">
+      {label}
+      <span className="text-[8px] text-theme-muted group-hover:text-brand transition-colors">
+        {sortConfig.key === sortKey ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇅"}
+      </span>
+    </span>
+  </th>
+);
 export const DispatcherDashboard = () => {
   const [search, setSearch] = useState("");
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState("All");
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: "asc" });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === "asc" ? "desc" : "asc"
+    }));
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboardStats"],
@@ -263,16 +294,25 @@ export const DispatcherDashboard = () => {
               <table className="w-full text-left text-xs font-mono">
                 <thead>
                   <tr className="border-b border-dark-border pb-3 text-theme-muted text-[10px] uppercase">
-                    <th className="py-2.5">Trip ID</th>
-                    <th>Vehicle</th>
-                    <th>Driver</th>
-                    <th>Route Map</th>
-                    <th>Status</th>
+                    <SortableHeader label="Trip ID" sortKey="tripId" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortableHeader label="Vehicle" sortKey="vehicle" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortableHeader label="Driver" sortKey="driver" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortableHeader label="Route Map" sortKey="source" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortableHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} />
                     <th className="text-right">ETA / Progress</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                  {filteredTrips.map((trip) => (
+                  {[...filteredTrips].sort((a, b) => {
+                    if (!sortConfig.key) return 0;
+                    let aVal = a[sortConfig.key];
+                    let bVal = b[sortConfig.key];
+                    if (typeof aVal === "string") aVal = aVal.toLowerCase();
+                    if (typeof bVal === "string") bVal = bVal.toLowerCase();
+                    if (aVal < bVal) return sortConfig.dir === "asc" ? -1 : 1;
+                    if (aVal > bVal) return sortConfig.dir === "asc" ? 1 : -1;
+                    return 0;
+                  }).map((trip) => (
                     <tr key={trip.id} className="hover:bg-dark-hoverBg/25 transition-colors">
                       <td className="py-3 text-brand font-bold">{trip.tripId}</td>
                       <td>
@@ -312,79 +352,63 @@ export const DispatcherDashboard = () => {
           </div>
         </div>
 
-        {/* VEHICLE STATUS PROGRESS BARS (1/3 width) */}
-        <div className="bg-theme-panel border border-dark-border rounded p-6 shadow space-y-6">
+        {/* VEHICLE STATUS DISTRIBUTION (1/3 width with Recharts PieChart) */}
+        <div className="bg-theme-panel border border-dark-border rounded p-6 shadow space-y-4">
           <h3 className="text-sm font-bold font-mono uppercase tracking-wider text-theme-text flex items-center gap-2">
             <Truck className="w-4 h-4 text-brand" /> Vehicle Status Distribution
           </h3>
 
-          <div className="space-y-4">
-            {/* Available */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Available
-                </span>
-                <span className="font-bold">{vehicleStatus.available} vehicles ({getPct(vehicleStatus.available)}%)</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
-                <div 
-                  className="bg-green-500 h-full transition-all duration-500" 
-                  style={{ width: `${getPct(vehicleStatus.available)}%` }}
-                ></div>
-              </div>
-            </div>
+          <div className="h-44 w-full flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Available", value: vehicleStatus.available || 0 },
+                    { name: "On Trip", value: vehicleStatus.onTrip || 0 },
+                    { name: "In Shop", value: vehicleStatus.inShop || 0 },
+                    { name: "Retired", value: vehicleStatus.retired || 0 }
+                  ].filter(d => d.value > 0)}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={35}
+                  outerRadius={55}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {[
+                    { name: "Available", color: "#22c55e" },
+                    { name: "On Trip", color: "#3b82f6" },
+                    { name: "In Shop", color: "#f59e0b" },
+                    { name: "Retired", color: "#ef4444" }
+                  ].filter(col => (vehicleStatus[col.name === "On Trip" ? "onTrip" : col.name === "In Shop" ? "inShop" : col.name.toLowerCase()] || 0) > 0).map((entry, idx) => (
+                    <Cell key={`cell-${idx}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", fontSize: "10px" }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-            {/* On Trip */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> On Trip
-                </span>
-                <span className="font-bold">{vehicleStatus.onTrip} vehicles ({getPct(vehicleStatus.onTrip)}%)</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
-                <div 
-                  className="bg-blue-500 h-full transition-all duration-500" 
-                  style={{ width: `${getPct(vehicleStatus.onTrip)}%` }}
-                ></div>
-              </div>
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between text-[10px] font-mono text-theme-text">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500"></span> Available</span>
+              <span className="font-bold">{vehicleStatus.available} ({getPct(vehicleStatus.available)}%)</span>
             </div>
-
-            {/* In Shop */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Shop
-                </span>
-                <span className="font-bold">{vehicleStatus.inShop} vehicles ({getPct(vehicleStatus.inShop)}%)</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
-                <div 
-                  className="bg-amber-500 h-full transition-all duration-500" 
-                  style={{ width: `${getPct(vehicleStatus.inShop)}%` }}
-                ></div>
-              </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-theme-text">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500"></span> On Trip</span>
+              <span className="font-bold">{vehicleStatus.onTrip} ({getPct(vehicleStatus.onTrip)}%)</span>
             </div>
-
-            {/* Retired */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Retired
-                </span>
-                <span className="font-bold">{vehicleStatus.retired} vehicles ({getPct(vehicleStatus.retired)}%)</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
-                <div 
-                  className="bg-red-500 h-full transition-all duration-500" 
-                  style={{ width: `${getPct(vehicleStatus.retired)}%` }}
-                ></div>
-              </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-theme-text">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500"></span> In Shop</span>
+              <span className="font-bold">{vehicleStatus.inShop} ({getPct(vehicleStatus.inShop)}%)</span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-theme-text">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span> Retired</span>
+              <span className="font-bold">{vehicleStatus.retired} ({getPct(vehicleStatus.retired)}%)</span>
             </div>
           </div>
 
-          <div className="border-t border-dark-border/40 pt-4 text-center">
+          <div className="border-t border-dark-border/40 pt-3 text-center">
             <span className="text-[10px] text-theme-muted font-mono">
               TOTAL OPERATIONAL FLEET: {totalVehicles - (vehicleStatus.retired || 0)} UNITS
             </span>
@@ -1074,6 +1098,18 @@ export const FleetRegistry = () => {
   const [searchRegNo, setSearchRegNo] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: "asc" });
+
+  // Document management states
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [docVehicleId, setDocVehicleId] = useState(null);
+  const [docName, setDocName] = useState("");
+  const [docType, setDocType] = useState("Insurance");
+  const [docNo, setDocNo] = useState("");
+  const [docIssueDate, setDocIssueDate] = useState("");
+  const [docExpiryDate, setDocExpiryDate] = useState("");
+  const [docNotes, setDocNotes] = useState("");
+  const [expandedVehicleId, setExpandedVehicleId] = useState(null);
 
   // Form states
   const [regNo, setRegNo] = useState("");
@@ -1144,6 +1180,81 @@ export const FleetRegistry = () => {
     document.body.removeChild(link);
   };
 
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const handleExportFleetPDF = () => {
+    const doc = new jsPDF();
+    doc.setFillColor(24, 24, 27);
+    doc.rect(0, 0, 210, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TRANSITOPS FLEET REGISTRY REPORT", 15, 25);
+    doc.setTextColor(82, 82, 91);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 55);
+    doc.text(`Total Vehicles: ${(vehicles || []).length}`, 15, 62);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("VEHICLE ASSET MANIFEST", 15, 80);
+    doc.line(15, 82, 195, 82);
+
+    let yPos = 92;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    (vehicles || []).forEach((v, i) => {
+      if (yPos > 270) { doc.addPage(); yPos = 20; }
+      doc.text(`${i + 1}. ${v.registrationNo} — ${v.name} | Type: ${v.type} | Cap: ${v.capacityKg}kg | ODO: ${v.odometerKm}km | Status: ${v.status}`, 15, yPos);
+      yPos += 7;
+    });
+
+    doc.save(`Fleet_Registry_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const handleAddDocument = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      await axios.post(`http://localhost:5000/api/vehicles/${docVehicleId}/documents`, {
+        name: docName,
+        type: docType,
+        documentNo: docNo,
+        issueDate: docIssueDate || null,
+        expiryDate: docExpiryDate || null,
+        notes: docNotes
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccessMsg("Document added successfully!");
+      setIsDocModalOpen(false);
+      setDocName(""); setDocType("Insurance"); setDocNo("");
+      setDocIssueDate(""); setDocExpiryDate(""); setDocNotes("");
+      refetch();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to add document");
+    }
+  };
+
+  const handleDeleteDocument = async (vehicleId, docId) => {
+    setErrorMsg("");
+    try {
+      await axios.delete(`http://localhost:5000/api/vehicles/${vehicleId}/documents/${docId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccessMsg("Document removed.");
+      refetch();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to delete document");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -1182,6 +1293,18 @@ export const FleetRegistry = () => {
     return matchesSearch && matchesType && matchesStatus;
   });
 
+  // Apply sorting
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+    if (typeof aVal === "string") aVal = aVal.toLowerCase();
+    if (typeof bVal === "string") bVal = bVal.toLowerCase();
+    if (aVal < bVal) return sortConfig.dir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortConfig.dir === "asc" ? 1 : -1;
+    return 0;
+  });
+
   // Analytics helper metrics
   const totalVehiclesCount = (vehicles || []).length;
   const operationalCount = (vehicles || []).filter(v => v.status !== "Retired").length;
@@ -1207,6 +1330,12 @@ export const FleetRegistry = () => {
           <p className="text-xs text-theme-muted mt-1 font-mono">Manage and track company transportation assets.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportFleetPDF}
+            className="bg-dark-surface border border-dark-border text-white font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-dark-hoverBg flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+          >
+            <FileText className="w-4 h-4" /> Export PDF
+          </button>
           <button
             onClick={handleExportCSV}
             className="bg-dark-surface border border-dark-border text-white font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-dark-hoverBg flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
@@ -1431,26 +1560,29 @@ export const FleetRegistry = () => {
       {/* VEHICLES LEDGER TABLE */}
       <div className="bg-theme-panel border border-dark-border rounded p-6 shadow">
         <div className="overflow-x-auto">
-          {filtered.length > 0 ? (
+          {sorted.length > 0 ? (
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-dark-border pb-3 text-theme-muted text-[10px] uppercase">
-                  <th className="py-2.5">Reg. No. (Unique)</th>
-                  <th>Name/Model</th>
-                  <th>Type</th>
-                  <th>Capacity</th>
-                  <th>Odometer</th>
-                  <th>Acq. Cost</th>
-                  <th className="text-right">Status</th>
+                  <SortableHeader label="Reg. No." sortKey="registrationNo" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Name/Model" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Type" sortKey="type" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Capacity" sortKey="capacityKg" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Odometer" sortKey="odometerKm" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Acq. Cost" sortKey="acquisitionCost" sortConfig={sortConfig} onSort={handleSort} />
+                  <th className="text-center">Docs</th>
+                  <SortableHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} className="text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                {filtered.map(v => {
+                {sorted.map(v => {
                   const repairsCost = maintenanceCosts[v._id] || 0;
                   const isHighDepreciation = repairsCost >= (v.acquisitionCost || 0) * 0.5;
+                  const docs = v.documents || [];
 
                   return (
-                    <tr key={v._id} className="hover:bg-dark-hoverBg/25 transition-colors">
+                    <React.Fragment key={v._id}>
+                      <tr className="hover:bg-dark-hoverBg/25 transition-colors">
                       <td className="py-3 text-white font-bold">
                         <div>{v.registrationNo}</div>
                         {isHighDepreciation && (
@@ -1464,6 +1596,15 @@ export const FleetRegistry = () => {
                       <td>{v.capacityKg} kg</td>
                       <td className="technical-mono">{Number(v.odometerKm).toLocaleString()} km</td>
                       <td className="technical-mono">₹{Number(v.acquisitionCost).toLocaleString()}</td>
+                      <td className="text-center">
+                        <button
+                          onClick={() => setExpandedVehicleId(expandedVehicleId === v._id ? null : v._id)}
+                          className="text-theme-muted hover:text-brand transition-colors inline-flex items-center gap-0.5 text-[9px] font-bold uppercase"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" /> {docs.length}
+                          {expandedVehicleId === v._id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      </td>
                       <td className="text-right">
                         {v.status === "Available" && <span className="ops-badge-success">Available</span>}
                         {v.status === "OnTrip" && <span className="ops-badge-warning bg-blue-500/10 text-blue-400 border-blue-500/20">On Trip</span>}
@@ -1471,6 +1612,55 @@ export const FleetRegistry = () => {
                         {v.status === "Retired" && <span className="ops-badge-danger">Retired</span>}
                       </td>
                     </tr>
+                    {/* Document expansion row */}
+                    {expandedVehicleId === v._id && (
+                      <tr>
+                        <td colSpan="8" className="p-0">
+                          <div className="bg-dark-bg/50 border-t border-dark-border/30 p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-theme-muted font-bold uppercase tracking-wider">Documents — {v.registrationNo}</span>
+                              <button
+                                onClick={() => { setDocVehicleId(v._id); setIsDocModalOpen(true); }}
+                                className="bg-brand text-black font-bold text-[9px] uppercase px-2 py-1 rounded hover:bg-brand-light transition-colors flex items-center gap-0.5"
+                              >
+                                <Plus className="w-3 h-3" /> Add Document
+                              </button>
+                            </div>
+                            {docs.length > 0 ? (
+                              <div className="space-y-2">
+                                {docs.map(doc => {
+                                  const isDocExpired = doc.expiryDate && new Date(doc.expiryDate) < new Date();
+                                  return (
+                                    <div key={doc._id} className={`flex items-center justify-between p-2.5 rounded border text-[10px] ${isDocExpired ? 'bg-red-950/20 border-red-500/30' : 'bg-dark-surface border-dark-border'}`}>
+                                      <div className="flex items-center gap-3">
+                                        <FileCheck className={`w-4 h-4 ${isDocExpired ? 'text-red-400' : 'text-green-400'}`} />
+                                        <div>
+                                          <span className="font-bold text-white block">{doc.name}</span>
+                                          <span className="text-theme-muted">{doc.type} {doc.documentNo ? `• ${doc.documentNo}` : ''}
+                                            {doc.expiryDate ? ` • Exp: ${new Date(doc.expiryDate).toLocaleDateString()}` : ''}
+                                            {isDocExpired ? ' — EXPIRED' : ''}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => handleDeleteDocument(v._id, doc._id)}
+                                        className="text-red-400 hover:text-red-300 transition-colors p-1"
+                                        title="Delete document"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-theme-muted text-center py-3">No documents uploaded for this vehicle.</div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1482,6 +1672,58 @@ export const FleetRegistry = () => {
           )}
         </div>
       </div>
+
+      {/* DOCUMENT MODAL */}
+      {isDocModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs">
+          <div className="bg-theme-panel border border-dark-border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-dark-border/40 pb-3">
+              <h3 className="font-bold text-white font-mono text-sm uppercase">Add Vehicle Document</h3>
+              <button onClick={() => setIsDocModalOpen(false)} className="text-theme-muted hover:text-white font-mono text-sm">✕</button>
+            </div>
+            <form onSubmit={handleAddDocument} className="space-y-3 font-mono text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Document Name</label>
+                  <input type="text" required placeholder="e.g. Motor Insurance" value={docName} onChange={(e) => setDocName(e.target.value)} className="ops-input" />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Document Type</label>
+                  <select value={docType} onChange={(e) => setDocType(e.target.value)} className="ops-input cursor-pointer">
+                    <option value="Insurance">Insurance</option>
+                    <option value="Registration">Registration</option>
+                    <option value="Permit">Permit</option>
+                    <option value="Fitness">Fitness</option>
+                    <option value="PUC">PUC</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Document Number</label>
+                <input type="text" placeholder="e.g. POL-2026-1234" value={docNo} onChange={(e) => setDocNo(e.target.value)} className="ops-input" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Issue Date</label>
+                  <input type="date" value={docIssueDate} onChange={(e) => setDocIssueDate(e.target.value)} className="ops-input cursor-pointer" />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Expiry Date</label>
+                  <input type="date" value={docExpiryDate} onChange={(e) => setDocExpiryDate(e.target.value)} className="ops-input cursor-pointer" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Notes</label>
+                <input type="text" placeholder="Optional notes..." value={docNotes} onChange={(e) => setDocNotes(e.target.value)} className="ops-input" />
+              </div>
+              <button type="submit" className="w-full bg-brand text-black font-bold uppercase py-2.5 rounded hover:bg-brand-light tracking-wide text-xs mt-4 transition-colors">
+                Save Document
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Policy warning rules */}
       <div className="text-[10px] text-amber-500/80 font-mono uppercase text-center font-semibold tracking-wider">
@@ -1755,6 +1997,7 @@ export const DriverRegistry = () => {
   const [status, setStatus] = useState("Available");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: "asc" });
 
   const token = useAuthStore((state) => state.token);
 
@@ -1768,6 +2011,45 @@ export const DriverRegistry = () => {
       return response.data.data;
     }
   });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const handleExportDriversPDF = () => {
+    const doc = new jsPDF();
+    doc.setFillColor(24, 24, 27);
+    doc.rect(0, 0, 210, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TRANSITOPS DRIVER SAFETY REPORT", 15, 25);
+    doc.setTextColor(82, 82, 91);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 55);
+    doc.text(`Total Drivers: ${(drivers || []).length}`, 15, 62);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("DRIVER ROSTER", 15, 80);
+    doc.line(15, 82, 195, 82);
+
+    let yPos = 92;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    (drivers || []).forEach((d, i) => {
+      if (yPos > 270) { doc.addPage(); yPos = 20; }
+      const expDate = new Date(d.licenseExpiry).toLocaleDateString();
+      const expired = new Date(d.licenseExpiry) < new Date() ? " [EXPIRED]" : "";
+      doc.text(`${i + 1}. ${d.name} | License: ${d.licenseNo} (${d.licenseCategory}) | Expiry: ${expDate}${expired} | Safety: ${d.safetyScore}% | Status: ${d.status}`, 15, yPos);
+      yPos += 7;
+    });
+
+    doc.save(`Driver_Safety_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1836,12 +2118,20 @@ export const DriverRegistry = () => {
           <h2 className="text-xl font-bold font-mono uppercase tracking-tight font-sans">Drivers & Safety Profiles</h2>
           <p className="text-xs text-theme-muted mt-1 font-mono">Driver licensing, safety scores, and rosters tracking.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" /> Add Driver
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportDriversPDF}
+            className="bg-dark-surface border border-dark-border text-white font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-dark-hoverBg flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <FileText className="w-4 h-4" /> Export PDF
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" /> Add Driver
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -2007,18 +2297,27 @@ export const DriverRegistry = () => {
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-dark-border pb-3 text-theme-muted text-[10px] uppercase">
-                  <th className="py-2.5">Driver</th>
+                  <SortableHeader label="Driver" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
                   <th>License No.</th>
                   <th>Category</th>
-                  <th>Expiry</th>
+                  <SortableHeader label="Expiry" sortKey="licenseExpiry" sortConfig={sortConfig} onSort={handleSort} />
                   <th>Contact</th>
                   <th>Trip Compl.</th>
-                  <th>Safety</th>
-                  <th className="text-right">Status</th>
+                  <SortableHeader label="Safety" sortKey="safetyScore" sortConfig={sortConfig} onSort={handleSort} />
+                  <SortableHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} className="text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                {(drivers || []).map(d => {
+                {[...(drivers || [])].sort((a, b) => {
+                  if (!sortConfig.key) return 0;
+                  let aVal = a[sortConfig.key];
+                  let bVal = b[sortConfig.key];
+                  if (typeof aVal === "string") aVal = aVal.toLowerCase();
+                  if (typeof bVal === "string") bVal = bVal.toLowerCase();
+                  if (aVal < bVal) return sortConfig.dir === "asc" ? -1 : 1;
+                  if (aVal > bVal) return sortConfig.dir === "asc" ? 1 : -1;
+                  return 0;
+                }).map(d => {
                   const expired = isExpired(d.licenseExpiry);
                   return (
                     <tr key={d._id} className="hover:bg-dark-hoverBg/25 transition-colors">
@@ -2080,23 +2379,184 @@ export const DriverRegistry = () => {
 };
 
 // 6. Safety Officer component: Compliance
-export const ComplianceLogs = () => (
-  <div className="bg-dark-surface border border-dark-border p-6 rounded text-center py-12">
-    <ShieldAlert className="w-12 h-12 text-brand mx-auto mb-4" />
-    <h3 className="text-lg font-bold text-white font-mono">
-      COMPLIANCE ENGINE
-    </h3>
-    <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
-      Monitor safety violations and licensing checks. (This module will be fully
-      populated in the upcoming phases).
-    </p>
-  </div>
-);
+export const ComplianceLogs = () => {
+  const token = useAuthStore((state) => state.token);
+
+  const { data: drivers, isLoading: driversLoading } = useQuery({
+    queryKey: ["complianceDrivers"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/drivers", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data.data;
+    }
+  });
+
+  const { data: vehicles, isLoading: vehiclesLoading } = useQuery({
+    queryKey: ["complianceVehicles"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/vehicles", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data.data;
+    }
+  });
+
+  const { data: maintenance } = useQuery({
+    queryKey: ["complianceMaintenance"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/maintenance", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data.data;
+    }
+  });
+
+  if (driversLoading || vehiclesLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] text-theme-muted font-mono">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mb-4"></div>
+        <span>COMPILING COMPLIANCE DATA...</span>
+      </div>
+    );
+  }
+
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  // Filter Drivers with issues
+  const expiredDrivers = (drivers || []).filter(d => new Date(d.licenseExpiry) < now);
+  const expiringSoonDrivers = (drivers || []).filter(d => {
+    const exp = new Date(d.licenseExpiry);
+    return exp >= now && exp <= thirtyDaysFromNow;
+  });
+  const lowSafetyDrivers = (drivers || []).filter(d => (d.safetyScore || 100) < 85);
+
+  // Aggregate repair logs for vehicles
+  const maintenanceCosts = {};
+  (maintenance || []).forEach(log => {
+    const vId = log.vehicleId?._id || log.vehicleId;
+    if (vId) {
+      maintenanceCosts[vId] = (maintenanceCosts[vId] || 0) + (log.cost || 0);
+    }
+  });
+
+  // Filter Vehicles with issues (Retired or Depreciation Alert)
+  const depreciationAlertVehicles = (vehicles || []).filter(v => {
+    const repairsCost = maintenanceCosts[v._id] || 0;
+    return repairsCost >= (v.acquisitionCost || 0) * 0.5;
+  });
+
+  const totalComplianceScore = Math.max(0, 100 - (expiredDrivers.length * 15) - (expiringSoonDrivers.length * 5) - (lowSafetyDrivers.length * 10));
+
+  return (
+    <div className="space-y-6 text-theme-text font-mono text-xs">
+      <div>
+        <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Compliance & Safety Engine</h2>
+        <p className="text-[10px] text-theme-muted mt-1 font-mono">Auto-generated audit reports, driver credentials monitoring, and asset depreciation flags.</p>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow">
+          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Compliance Index</span>
+          <span className={`text-2xl font-bold block mt-1 ${totalComplianceScore > 80 ? 'text-green-400' : totalComplianceScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>{totalComplianceScore}%</span>
+          <span className="text-[8px] text-theme-muted block mt-2">Overall fleet status score</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-red-500">
+          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expired Licenses</span>
+          <span className="text-2xl font-bold block mt-1 text-red-400">{expiredDrivers.length}</span>
+          <span className="text-[8px] text-theme-muted block mt-2">Dispatch blocked drivers</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-amber-500">
+          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expiring Licenses</span>
+          <span className="text-2xl font-bold block mt-1 text-amber-400">{expiringSoonDrivers.length}</span>
+          <span className="text-[8px] text-theme-muted block mt-2">Expires within 30 days</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-brand">
+          <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Critical Safety</span>
+          <span className="text-2xl font-bold block mt-1 text-brand">{lowSafetyDrivers.length}</span>
+          <span className="text-[8px] text-theme-muted block mt-2">Safety Score &lt; 85%</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* DRIVERS CRITICAL COMPLIANCE */}
+        <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-red-500" /> Driver Credentials Verification
+          </h3>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+            {expiredDrivers.map(d => (
+              <div key={d._id} className="flex justify-between items-center bg-red-950/20 border border-red-500/30 p-2.5 rounded">
+                <div>
+                  <span className="font-bold text-white block">{d.name}</span>
+                  <span className="text-[10px] text-red-400 font-bold block mt-0.5">LICENSE EXPIRED ({new Date(d.licenseExpiry).toLocaleDateString()})</span>
+                </div>
+                <span className="ops-badge-danger">BLOCKED</span>
+              </div>
+            ))}
+            {expiringSoonDrivers.map(d => (
+              <div key={d._id} className="flex justify-between items-center bg-amber-950/20 border border-amber-500/30 p-2.5 rounded">
+                <div>
+                  <span className="font-bold text-white block">{d.name}</span>
+                  <span className="text-[10px] text-amber-400 block mt-0.5">Expires soon on {new Date(d.licenseExpiry).toLocaleDateString()}</span>
+                </div>
+                <span className="ops-badge-warning">RENEW NOW</span>
+              </div>
+            ))}
+            {lowSafetyDrivers.map(d => (
+              <div key={d._id} className="flex justify-between items-center bg-dark-surface border border-dark-border p-2.5 rounded">
+                <div>
+                  <span className="font-bold text-white block">{d.name}</span>
+                  <span className="text-[10px] text-brand font-bold block mt-0.5">SAFETY RATING: {d.safetyScore}%</span>
+                </div>
+                <span className="ops-badge-danger uppercase text-[9px]">Monitor</span>
+              </div>
+            ))}
+            {expiredDrivers.length === 0 && expiringSoonDrivers.length === 0 && lowSafetyDrivers.length === 0 && (
+              <div className="py-12 text-center text-theme-muted">All active drivers are fully compliant.</div>
+            )}
+          </div>
+        </div>
+
+        {/* VEHICLE DEPRECIATION & FLEET INTEGRITY */}
+        <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <Truck className="w-4 h-4 text-brand" /> Vehicle Depreciation & Cost Warnings
+          </h3>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+            {depreciationAlertVehicles.map(v => {
+              const repairs = maintenanceCosts[v._id] || 0;
+              return (
+                <div key={v._id} className="flex justify-between items-center bg-red-950/20 border border-red-500/30 p-2.5 rounded">
+                  <div>
+                    <span className="font-bold text-white block">{v.registrationNo} — {v.name}</span>
+                    <span className="text-[10px] text-red-400 block mt-0.5">Repairs (₹{repairs.toLocaleString()}) &gt;= 50% cost (₹{v.acquisitionCost.toLocaleString()})</span>
+                  </div>
+                  <span className="ops-badge-danger">DEPRECIATED</span>
+                </div>
+              );
+            })}
+            {depreciationAlertVehicles.length === 0 && (
+              <div className="py-12 text-center text-theme-muted">All vehicle assets are performing within normal cost profiles.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // 7. Financial Analyst component: Fuel & Expenses
 export const FuelExpenses = () => {
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [sortConfigFuel, setSortConfigFuel] = useState({ key: null, dir: "asc" });
+  const [sortConfigExpense, setSortConfigExpense] = useState({ key: null, dir: "asc" });
 
   // Fuel Form State
   const [fuelVehicle, setFuelVehicle] = useState("");
@@ -2253,11 +2713,81 @@ export const FuelExpenses = () => {
     document.body.removeChild(link);
   };
 
+  const handleSortFuel = (key) => {
+    setSortConfigFuel(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const handleSortExpense = (key) => {
+    setSortConfigExpense(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const handleExportFinancialReportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFillColor(24, 24, 27);
+    doc.rect(0, 0, 210, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TRANSITOPS FINANCIAL REPORT", 15, 25);
+    doc.setTextColor(82, 82, 91);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 55);
+    doc.text(`Total Operational Cost: INR ${Number(metrics.totalOperationalCost || 0).toLocaleString()}`, 15, 62);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("FUEL LOG ENTRIES", 15, 80);
+    doc.line(15, 82, 195, 82);
+
+    let yPos = 92;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    (fuelLogs || []).forEach((log, i) => {
+      if (yPos > 270) { doc.addPage(); yPos = 20; }
+      const reg = log.vehicleId ? log.vehicleId.registrationNo : "—";
+      doc.text(`${i + 1}. Vehicle: ${reg} | Date: ${getFormattedDate(log.date)} | Liters: ${log.liters} L | Cost: INR ${log.cost}`, 15, yPos);
+      yPos += 7;
+    });
+
+    yPos += 10;
+    if (yPos > 260) { doc.addPage(); yPos = 20; }
+    doc.setFont("helvetica", "bold");
+    doc.text("OTHER OPERATIONS EXPENSES", 15, yPos);
+    doc.line(15, yPos + 2, 195, yPos + 2);
+    yPos += 10;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    (otherExpenses || []).forEach((exp, i) => {
+      if (yPos > 270) { doc.addPage(); yPos = 20; }
+      const trip = exp.tripId ? exp.tripId.tripId : "—";
+      const reg = exp.vehicleId ? exp.vehicleId.registrationNo : "—";
+      doc.text(`${i + 1}. Trip: ${trip} | Vehicle: ${reg} | Toll: INR ${exp.toll} | Other: INR ${exp.other} | Maint: INR ${exp.maintenanceCost} | Total: INR ${exp.total}`, 15, yPos);
+      yPos += 7;
+    });
+
+    doc.save(`Financial_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="space-y-6 text-theme-text font-mono text-xs">
-      <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Fuel & Expense Management</h2>
-        <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Log vehicle fuel inputs, tolls, maintenance costs, and aggregate operations expenses.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Fuel & Expense Management</h2>
+          <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Log vehicle fuel inputs, tolls, maintenance costs, and aggregate operations expenses.</p>
+        </div>
+        <button
+          onClick={handleExportFinancialReportPDF}
+          className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+        >
+          <FileText className="w-4 h-4" /> Export Report (PDF)
+        </button>
       </div>
 
       {errorMsg && (
@@ -2450,14 +2980,23 @@ export const FuelExpenses = () => {
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-dark-border pb-2.5 text-theme-muted text-[10px] uppercase">
-                  <th className="py-2">Vehicle</th>
-                  <th>Date</th>
-                  <th>Liters</th>
-                  <th className="text-right">Fuel Cost (₹)</th>
+                  <SortableHeader label="Vehicle" sortKey="vehicleId" sortConfig={sortConfigFuel} onSort={handleSortFuel} />
+                  <SortableHeader label="Date" sortKey="date" sortConfig={sortConfigFuel} onSort={handleSortFuel} />
+                  <SortableHeader label="Liters" sortKey="liters" sortConfig={sortConfigFuel} onSort={handleSortFuel} />
+                  <SortableHeader label="Fuel Cost (₹)" sortKey="cost" sortConfig={sortConfigFuel} onSort={handleSortFuel} className="text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                {fuelLogs.map(log => (
+                {[...fuelLogs].sort((a, b) => {
+                  if (!sortConfigFuel.key) return 0;
+                  let aVal = sortConfigFuel.key === "vehicleId" ? (a.vehicleId?.registrationNo || "") : a[sortConfigFuel.key];
+                  let bVal = sortConfigFuel.key === "vehicleId" ? (b.vehicleId?.registrationNo || "") : b[sortConfigFuel.key];
+                  if (typeof aVal === "string") aVal = aVal.toLowerCase();
+                  if (typeof bVal === "string") bVal = bVal.toLowerCase();
+                  if (aVal < bVal) return sortConfigFuel.dir === "asc" ? -1 : 1;
+                  if (aVal > bVal) return sortConfigFuel.dir === "asc" ? 1 : -1;
+                  return 0;
+                }).map(log => (
                   <tr key={log._id} className="hover:bg-dark-hoverBg/20">
                     <td className="py-2.5 font-bold text-white">
                       {log.vehicleId ? log.vehicleId.registrationNo : "—"}
@@ -2500,16 +3039,25 @@ export const FuelExpenses = () => {
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-dark-border pb-2.5 text-theme-muted text-[10px] uppercase">
-                  <th className="py-2">Trip</th>
-                  <th>Vehicle</th>
-                  <th>Toll (₹)</th>
-                  <th>Other (₹)</th>
-                  <th>Maint. (Linked)</th>
-                  <th className="text-right">Total (₹)</th>
+                  <SortableHeader label="Trip" sortKey="tripId" sortConfig={sortConfigExpense} onSort={handleSortExpense} />
+                  <SortableHeader label="Vehicle" sortKey="vehicleId" sortConfig={sortConfigExpense} onSort={handleSortExpense} />
+                  <SortableHeader label="Toll (₹)" sortKey="toll" sortConfig={sortConfigExpense} onSort={handleSortExpense} />
+                  <SortableHeader label="Other (₹)" sortKey="other" sortConfig={sortConfigExpense} onSort={handleSortExpense} />
+                  <SortableHeader label="Maint. (Linked)" sortKey="maintenanceCost" sortConfig={sortConfigExpense} onSort={handleSortExpense} />
+                  <SortableHeader label="Total (₹)" sortKey="total" sortConfig={sortConfigExpense} onSort={handleSortExpense} className="text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                {otherExpenses.map(exp => (
+                {[...otherExpenses].sort((a, b) => {
+                  if (!sortConfigExpense.key) return 0;
+                  let aVal = sortConfigExpense.key === "tripId" ? (a.tripId?.tripId || "") : sortConfigExpense.key === "vehicleId" ? (a.vehicleId?.registrationNo || "") : a[sortConfigExpense.key];
+                  let bVal = sortConfigExpense.key === "tripId" ? (b.tripId?.tripId || "") : sortConfigExpense.key === "vehicleId" ? (b.vehicleId?.registrationNo || "") : b[sortConfigExpense.key];
+                  if (typeof aVal === "string") aVal = aVal.toLowerCase();
+                  if (typeof bVal === "string") bVal = bVal.toLowerCase();
+                  if (aVal < bVal) return sortConfigExpense.dir === "asc" ? -1 : 1;
+                  if (aVal > bVal) return sortConfigExpense.dir === "asc" ? 1 : -1;
+                  return 0;
+                }).map(exp => (
                   <tr key={exp._id} className="hover:bg-dark-hoverBg/20">
                     <td className="py-2.5 text-white font-bold">{exp.tripId ? exp.tripId.tripId : "—"}</td>
                     <td>{exp.vehicleId ? exp.vehicleId.registrationNo : "—"}</td>
@@ -2682,66 +3230,52 @@ export const AnalyticsDashboard = () => {
         <div className="lg:col-span-7 bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-white">Monthly Revenue</h3>
           
-          {/* Custom CSS visual bar chart */}
-          <div className="h-44 flex items-end justify-between gap-3 pt-6 border-b border-dark-border/40 pb-2">
-            {[
-              { month: "Jan", val: 55 },
-              { month: "Feb", val: 70 },
-              { month: "Mar", val: 60 },
-              { month: "Apr", val: 85 },
-              { month: "May", val: 78 },
-              { month: "Jun", val: 95 },
-              { month: "Jul", val: 90 }
-            ].map((col, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div 
-                  className="w-full bg-blue-500/80 hover:bg-brand rounded-t transition-all duration-300"
-                  style={{ height: `${col.val}%` }}
-                  title={`₹${col.val * 1000} logged`}
-                ></div>
-                <span className="text-[9px] text-theme-muted font-bold block group-hover:text-white">{col.month}</span>
-              </div>
-            ))}
+          <div className="h-56 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={[
+                  { month: "Jan", Revenue: 55000 },
+                  { month: "Feb", Revenue: 70000 },
+                  { month: "Mar", Revenue: 60000 },
+                  { month: "Apr", Revenue: 85000 },
+                  { month: "May", Revenue: 78000 },
+                  { month: "Jun", Revenue: 95000 },
+                  { month: "Jul", Revenue: 90000 }
+                ]}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickLine={false} />
+                <YAxis stroke="#71717a" fontSize={10} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", fontSize: "10px" }} />
+                <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
         {/* TOP COSTLIEST VEHICLES (col-span-5) */}
         <div className="lg:col-span-5 bg-theme-panel border border-dark-border p-6 rounded shadow space-y-5">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-white">Top Costliest Vehicles</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white">Top Costliest Vehicles (Repairs)</h3>
           
-          <div className="space-y-4 pt-2">
-            {/* Vehicle 1 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px] text-theme-text font-bold">
-                <span>TRUCK-11</span>
-                <span>₹18,000</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2 rounded overflow-hidden">
-                <div className="bg-red-500 h-full w-[85%]"></div>
-              </div>
-            </div>
-
-            {/* Vehicle 2 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px] text-theme-text font-bold">
-                <span>MINI-03</span>
-                <span>₹6,200</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2 rounded overflow-hidden">
-                <div className="bg-amber-500 h-full w-[45%]"></div>
-              </div>
-            </div>
-
-            {/* Vehicle 3 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px] text-theme-text font-bold">
-                <span>VAN-05</span>
-                <span>₹2,500</span>
-              </div>
-              <div className="w-full bg-dark-bg border border-dark-border h-2 rounded overflow-hidden">
-                <div className="bg-blue-500 h-full w-[20%]"></div>
-              </div>
-            </div>
+          <div className="h-56 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={[
+                  { vehicle: "TRK-12", cost: 18000 },
+                  { vehicle: "MINI-08", cost: 6200 },
+                  { vehicle: "VAN-05", cost: 2500 }
+                ]}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis type="number" stroke="#71717a" fontSize={10} tickLine={false} />
+                <YAxis dataKey="vehicle" type="category" stroke="#71717a" fontSize={10} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", fontSize: "10px" }} />
+                <Bar dataKey="cost" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 

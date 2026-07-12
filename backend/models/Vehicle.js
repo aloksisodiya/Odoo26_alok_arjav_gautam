@@ -36,7 +36,38 @@ const VehicleSchema = new mongoose.Schema({
     type: String,
     enum: ['Available', 'OnTrip', 'InShop', 'Retired'],
     default: 'Available'
-  }
+  },
+  documents: [{
+    name: {
+      type: String,
+      required: [true, 'Please add a document name']
+    },
+    type: {
+      type: String,
+      enum: ['Insurance', 'Registration', 'Permit', 'Fitness', 'PUC', 'Other'],
+      required: [true, 'Please specify document type']
+    },
+    documentNo: {
+      type: String,
+      default: ''
+    },
+    issueDate: {
+      type: Date,
+      default: null
+    },
+    expiryDate: {
+      type: Date,
+      default: null
+    },
+    notes: {
+      type: String,
+      default: ''
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });

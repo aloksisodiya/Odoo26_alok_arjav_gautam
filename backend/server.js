@@ -10,6 +10,7 @@ const tripRoutes = require('./routes/trips');
 const maintenanceRoutes = require('./routes/maintenance');
 const expenseRoutes = require('./routes/expenses');
 const alertRoutes = require('./routes/alerts');
+const licenseReminderRoutes = require('./routes/licenseReminder');
 
 // Connect to Database
 connectDB();
@@ -32,6 +33,7 @@ app.use('/api/trips', tripRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/license-reminders', licenseReminderRoutes);
 
 // Simple Health Check Endpoint
 app.get('/api/health', (req, res) => {

@@ -48,6 +48,20 @@ const DashboardLayout = ({ children }) => {
     refetchInterval: 10000 // Refetch every 10s
   });
 
+  // License Expiry Reminders background checker
+  useQuery({
+    queryKey: ["licenseRemindersCheck"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/license-reminders/check", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      refetchAlerts();
+      return response.data.data;
+    },
+    enabled: !!user,
+    refetchInterval: 30000 // Check every 30s
+  });
+
   const handleResolveAlert = async (alertId) => {
     try {
       await axios.put(`http://localhost:5000/api/alerts/${alertId}/resolve`, {}, {
