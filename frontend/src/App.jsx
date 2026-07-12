@@ -65,6 +65,8 @@ const AuthRedirect = ({ children }) => {
         return <Navigate to="/drivers" replace />;
       case "FinancialAnalyst":
         return <Navigate to="/expenses" replace />;
+      case "Admin":
+        return <Navigate to="/settings" replace />;
       default:
         return <Navigate to="/dashboard" replace />;
     }
@@ -134,7 +136,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Dispatcher"]}>
                 <DashboardLayout>
                   <DispatcherDashboard />
                 </DashboardLayout>
@@ -144,7 +146,7 @@ function App() {
           <Route
             path="/trips"
             element={
-              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+              <ProtectedRoute allowedRoles={["Admin", "Dispatcher"]}>
                 <DashboardLayout>
                   <TripsManager />
                 </DashboardLayout>
@@ -155,7 +157,7 @@ function App() {
           <Route
             path="/fleet"
             element={
-              <ProtectedRoute allowedRoles={["FleetManager"]}>
+              <ProtectedRoute allowedRoles={["Admin", "FleetManager"]}>
                 <DashboardLayout>
                   <FleetRegistry />
                 </DashboardLayout>
@@ -165,7 +167,7 @@ function App() {
           <Route
             path="/maintenance"
             element={
-              <ProtectedRoute allowedRoles={["FleetManager"]}>
+              <ProtectedRoute allowedRoles={["Admin", "FleetManager"]}>
                 <DashboardLayout>
                   <MaintenanceLogs />
                 </DashboardLayout>
@@ -176,7 +178,7 @@ function App() {
           <Route
             path="/drivers"
             element={
-              <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
+              <ProtectedRoute allowedRoles={["Admin", "SafetyOfficer"]}>
                 <DashboardLayout>
                   <DriverRegistry />
                 </DashboardLayout>
@@ -186,7 +188,7 @@ function App() {
           <Route
             path="/compliance"
             element={
-              <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
+              <ProtectedRoute allowedRoles={["Admin", "SafetyOfficer"]}>
                 <DashboardLayout>
                   <ComplianceLogs />
                 </DashboardLayout>
@@ -197,7 +199,7 @@ function App() {
           <Route
             path="/expenses"
             element={
-              <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
+              <ProtectedRoute allowedRoles={["Admin", "FinancialAnalyst"]}>
                 <DashboardLayout>
                   <FuelExpenses />
                 </DashboardLayout>
@@ -207,7 +209,7 @@ function App() {
           <Route
             path="/analytics"
             element={
-              <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
+              <ProtectedRoute allowedRoles={["Admin", "FinancialAnalyst"]}>
                 <DashboardLayout>
                   <AnalyticsDashboard />
                 </DashboardLayout>
@@ -219,7 +221,15 @@ function App() {
           <Route
             path="/settings"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute
+                allowedRoles={[
+                  "Admin",
+                  "FleetManager",
+                  "Dispatcher",
+                  "SafetyOfficer",
+                  "FinancialAnalyst",
+                ]}
+              >
                 <DashboardLayout>
                   <SystemSettings />
                 </DashboardLayout>

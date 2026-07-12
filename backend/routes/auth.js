@@ -24,6 +24,7 @@ const registerSchema = z.object({
     .string()
     .min(6, { message: "Password must be at least 6 characters long" }),
   role: z.enum([
+    "Admin",
     "FleetManager",
     "Dispatcher",
     "SafetyOfficer",
@@ -256,12 +257,10 @@ router.post("/reset-password", async (req, res) => {
 
     const tokenData = resetTokens.get(token);
     if (!tokenData) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Invalid or expired password reset token",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired password reset token",
+      });
     }
 
     if (Date.now() > tokenData.expiry) {

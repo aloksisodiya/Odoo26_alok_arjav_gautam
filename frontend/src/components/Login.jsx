@@ -88,6 +88,7 @@ const Login = () => {
             </h2>
             <ul className="space-y-4">
               {[
+                { name: "Admin", desc: "Full system access" },
                 { name: "Fleet Manager", desc: "Registry & Maintenance" },
                 { name: "Dispatcher", desc: "Dashboard & Trip dispatching" },
                 { name: "Safety Officer", desc: "Driver safety compliance" },
@@ -201,6 +202,7 @@ const Login = () => {
                   className="ops-input pl-9 appearance-none cursor-pointer"
                   disabled={loading}
                 >
+                  <option value="Admin">Admin</option>
                   <option value="FleetManager">Fleet Manager</option>
                   <option value="Dispatcher">Dispatcher</option>
                   <option value="SafetyOfficer">Safety Officer</option>

@@ -227,6 +227,7 @@ const Register = () => {
                   className="ops-input pl-9 appearance-none cursor-pointer"
                   disabled={loading}
                 >
+                  <option value="Admin">Admin</option>
                   <option value="FleetManager">Fleet Manager</option>
                   <option value="Dispatcher">Dispatcher</option>
                   <option value="SafetyOfficer">Safety Officer</option>
