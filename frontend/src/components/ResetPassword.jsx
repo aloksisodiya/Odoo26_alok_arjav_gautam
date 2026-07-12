@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Shield, Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+import React, { useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { Shield, Lock, CheckCircle, ArrowLeft } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 const ResetPassword = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -18,31 +19,34 @@ const ResetPassword = () => {
     setError(null);
 
     if (!password || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       setLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       setLoading(false);
       return;
     }
 
     try {
-      await axios.post('http://localhost:5000/api/auth/reset-password', {
+      await axios.post("http://localhost:5000/api/auth/reset-password", {
         token,
-        password
+        password,
       });
       setSuccess(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reset password. The link may be expired.');
+      setError(
+        err.response?.data?.message ||
+          "Failed to reset password. The link may be expired.",
+      );
     } finally {
       setLoading(false);
     }
@@ -50,20 +54,26 @@ const ResetPassword = () => {
 
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-[#121216]/60 border border-dark-border p-8 rounded shadow-2xl backdrop-blur-md">
-        
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-md bg-dark-surface/90 border border-dark-border p-8 rounded shadow-2xl backdrop-blur-md">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8 justify-center">
           <div className="w-8 h-8 bg-brand flex items-center justify-center rounded">
             <Shield className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-white font-mono">TransitOps</span>
+          <span className="text-xl font-bold tracking-tight text-white font-mono">
+            TransitOps
+          </span>
         </div>
 
         {!success ? (
           <>
             <div className="mb-6 text-center">
-              <h3 className="text-xl font-semibold text-white tracking-tight font-mono">New Password</h3>
+              <h3 className="text-xl font-semibold text-white tracking-tight font-mono">
+                New Password
+              </h3>
               <p className="text-xs text-gray-400 mt-1">
                 Enter your new secure operational password.
               </p>
@@ -117,7 +127,7 @@ const ResetPassword = () => {
                 className="ops-btn-primary flex items-center justify-center gap-2"
                 disabled={loading}
               >
-                {loading ? 'Updating...' : 'Reset Password'}
+                {loading ? "Updating..." : "Reset Password"}
               </button>
             </form>
           </>
@@ -126,7 +136,9 @@ const ResetPassword = () => {
             <div className="w-12 h-12 bg-green-950/40 border border-green-800/40 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
-            <h3 className="text-lg font-semibold text-white tracking-tight font-mono mb-2">Success</h3>
+            <h3 className="text-lg font-semibold text-white tracking-tight font-mono mb-2">
+              Success
+            </h3>
             <p className="text-xs text-gray-400 mb-6 leading-relaxed">
               Your password has been reset successfully. You can now login.
             </p>
@@ -149,7 +161,6 @@ const ResetPassword = () => {
             </Link>
           </div>
         )}
-
       </div>
     </div>
   );

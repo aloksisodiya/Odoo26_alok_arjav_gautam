@@ -1,31 +1,54 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
         dark: {
-          bg: '#0a0a0c',        // Deep operational black
-          surface: '#121216',   // Cards & Panels
-          border: '#22222a',    // Technical borders
-          cardBg: '#16161a',
-          hoverBg: '#1e1e24',
-          mutedText: '#8e8e9f'
+          bg: "var(--color-bg)",
+          surface: "var(--color-surface)",
+          border: "var(--color-border)",
+          cardBg: "var(--color-card-bg)",
+          hoverBg: "var(--color-hover-bg)",
+          mutedText: "var(--color-muted-text)",
         },
         brand: {
-          DEFAULT: '#d97706',   // Amber/orange operational color
-          light: '#fbbf24',
-          dark: '#b45309'
-        }
+          DEFAULT: "var(--color-brand)",
+          light: "var(--color-brand-light)",
+          dark: "var(--color-brand-dark)",
+        },
+        theme: {
+          text: "var(--color-text)",
+          muted: "var(--color-muted-text)",
+          panel: "var(--color-panel)",
+          panelAlt: "var(--color-panel-alt)",
+        },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'Courier', 'monospace']
-      }
+        sans: [
+          "Inter",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Oxygen",
+          "Ubuntu",
+          "Cantarell",
+          "Open Sans",
+          "Helvetica Neue",
+          "sans-serif",
+        ],
+        mono: [
+          "JetBrains Mono",
+          "Fira Code",
+          "Courier New",
+          "Courier",
+          "monospace",
+        ],
+      },
     },
   },
   plugins: [],
-}
+};

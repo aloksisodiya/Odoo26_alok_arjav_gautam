@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { Shield, Lock, Mail, Users, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
+import { Shield, Lock, Mail, Users, AlertTriangle } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Dispatcher'); // Default matching the wireframe
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("Dispatcher"); // Default matching the wireframe
   const [rememberMe, setRememberMe] = useState(false);
   const [localError, setLocalError] = useState(null);
-  
+
   const { login, error, clearError, loading } = useAuthStore();
   const navigate = useNavigate();
 
@@ -28,7 +29,7 @@ const Login = () => {
     clearError();
 
     if (!email || !password || !role) {
-      setLocalError('Please fill in all fields');
+      setLocalError("Please fill in all fields");
       return;
     }
 
@@ -36,57 +37,35 @@ const Login = () => {
       const user = await login(email, password, role, rememberMe);
       // Redirect based on role
       switch (user.role) {
-        case 'FleetManager':
-          navigate('/fleet');
+        case "FleetManager":
+          navigate("/fleet");
           break;
-        case 'Dispatcher':
-          navigate('/dashboard');
+        case "Dispatcher":
+          navigate("/dashboard");
           break;
-        case 'SafetyOfficer':
-          navigate('/drivers');
+        case "SafetyOfficer":
+          navigate("/drivers");
           break;
-        case 'FinancialAnalyst':
-          navigate('/expenses');
+        case "FinancialAnalyst":
+          navigate("/expenses");
           break;
         default:
-          navigate('/dashboard');
+          navigate("/dashboard");
       }
     } catch (err) {
       // Error handled by store, shown in UI
-      console.log('Login error:', err.message);
-    }
-  };
-
-  // Helper to autofill demo accounts for evaluator convenience
-  const handleRoleQuickSelect = (selectedRole) => {
-    setRole(selectedRole);
-    switch (selectedRole) {
-      case 'FleetManager':
-        setEmail('fleet@transitops.com');
-        setPassword('Password123');
-        break;
-      case 'Dispatcher':
-        setEmail('dispatcher@transitops.com');
-        setPassword('Password123');
-        break;
-      case 'SafetyOfficer':
-        setEmail('safety@transitops.com');
-        setPassword('Password123');
-        break;
-      case 'FinancialAnalyst':
-        setEmail('analyst@transitops.com');
-        setPassword('Password123');
-        break;
-      default:
-        break;
+      console.log("Login error:", err.message);
     }
   };
 
   return (
     <div className="min-h-screen bg-dark-bg flex flex-col md:flex-row relative">
-      
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* LEFT SIDE: Branding Panel (Greyish operational panel) */}
-      <div className="md:w-5/12 bg-[#2d3139] border-r border-dark-border p-8 md:p-16 flex flex-col justify-between text-gray-300">
+      <div className="md:w-5/12 bg-theme-panel border-r border-dark-border p-8 md:p-16 flex flex-col justify-between text-gray-300">
         <div>
           {/* Logo Brand */}
           <div className="flex items-center gap-3 mb-6">
@@ -94,24 +73,35 @@ const Login = () => {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white font-mono">TransitOps</h1>
-              <p className="text-xs text-brand tracking-wider font-mono font-bold">SMART TRANSPORT OPERATIONS</p>
+              <h1 className="text-2xl font-bold tracking-tight text-white font-mono">
+                TransitOps
+              </h1>
+              <p className="text-xs text-brand tracking-wider font-mono font-bold">
+                SMART TRANSPORT OPERATIONS
+              </p>
             </div>
           </div>
 
           <div className="mt-16">
-            <h2 className="text-xl font-semibold text-white mb-6 font-mono">One login, four roles:</h2>
+            <h2 className="text-xl font-semibold text-white mb-6 font-mono">
+              One login, four roles:
+            </h2>
             <ul className="space-y-4">
               {[
-                { name: 'Fleet Manager', desc: 'Registry & Maintenance' },
-                { name: 'Dispatcher', desc: 'Dashboard & Trip dispatching' },
-                { name: 'Safety Officer', desc: 'Driver safety compliance' },
-                { name: 'Financial Analyst', desc: 'Expenses & ROI analysis' }
+                { name: "Fleet Manager", desc: "Registry & Maintenance" },
+                { name: "Dispatcher", desc: "Dashboard & Trip dispatching" },
+                { name: "Safety Officer", desc: "Driver safety compliance" },
+                { name: "Financial Analyst", desc: "Expenses & ROI analysis" },
               ].map((item, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand mt-1.5 flex-shrink-0 animate-pulse"></span>
                   <div>
-                    <span className="font-medium text-white hover:text-brand cursor-pointer" onClick={() => handleRoleQuickSelect(item.name.replace(' ', ''))}>
+                    <span
+                      className="font-medium text-white hover:text-brand cursor-pointer"
+                      onClick={() =>
+                        handleRoleQuickSelect(item.name.replace(" ", ""))
+                      }
+                    >
                       {item.name}
                     </span>
                     <p className="text-xs text-gray-400">{item.desc}</p>
@@ -129,45 +119,32 @@ const Login = () => {
 
       {/* RIGHT SIDE: Auth Form */}
       <div className="flex-1 flex items-center justify-center p-8 md:p-16 relative">
-        
         {/* Wireframe Floating Error State style indicator */}
         {activeError && (
           <div className="absolute right-4 top-4 md:right-12 md:top-12 z-50 animate-bounce max-w-sm">
             <div className="bg-red-950/90 border border-red-500/50 text-red-300 p-4 rounded shadow-2xl flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-red-200 text-sm font-mono uppercase">Error State</h4>
+                <h4 className="font-bold text-red-200 text-sm font-mono uppercase">
+                  Error State
+                </h4>
                 <p className="text-xs mt-0.5 leading-relaxed">{activeError}</p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="w-full max-w-md bg-[#121216]/60 border border-dark-border p-8 rounded shadow-2xl backdrop-blur-md">
+        <div className="w-full max-w-md bg-dark-surface/90 border border-dark-border p-8 rounded shadow-2xl backdrop-blur-md">
           <div className="mb-8">
-            <h3 className="text-2xl font-semibold text-white tracking-tight font-mono">Sign in to your account</h3>
-            <p className="text-xs text-gray-400 mt-1">Enter your credentials to continue</p>
+            <h3 className="text-2xl font-semibold text-white tracking-tight font-mono">
+              Sign in to your account
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Enter your credentials to continue
+            </p>
           </div>
 
           {/* Quick seeded login helper button array for hackathon evaluation */}
-          <div className="mb-6 p-3 bg-dark-bg/60 border border-dark-border rounded">
-            <div className="text-[10px] text-brand font-mono font-bold uppercase tracking-wider mb-2">Demo Autologin Seed:</div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button onClick={() => handleRoleQuickSelect('FleetManager')} className="text-left px-2 py-1 bg-dark-surface hover:bg-dark-hoverBg border border-dark-border rounded text-gray-300 hover:text-white font-mono">
-                Fleet Mgr
-              </button>
-              <button onClick={() => handleRoleQuickSelect('Dispatcher')} className="text-left px-2 py-1 bg-dark-surface hover:bg-dark-hoverBg border border-dark-border rounded text-gray-300 hover:text-white font-mono">
-                Dispatcher
-              </button>
-              <button onClick={() => handleRoleQuickSelect('SafetyOfficer')} className="text-left px-2 py-1 bg-dark-surface hover:bg-dark-hoverBg border border-dark-border rounded text-gray-300 hover:text-white font-mono">
-                Safety Officer
-              </button>
-              <button onClick={() => handleRoleQuickSelect('FinancialAnalyst')} className="text-left px-2 py-1 bg-dark-surface hover:bg-dark-hoverBg border border-dark-border rounded text-gray-300 hover:text-white font-mono">
-                Analyst
-              </button>
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* EMAIL */}
             <div>
@@ -242,11 +219,14 @@ const Login = () => {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded bg-[#18181f] border-dark-border text-brand focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                  className="rounded bg-theme-panel border-dark-border text-brand focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
                 />
                 Remember me
               </label>
-              <Link to="/forgot-password" className="text-blue-400 hover:text-blue-300 font-mono transition-colors">
+              <Link
+                to="/forgot-password"
+                className="text-blue-400 hover:text-blue-300 font-mono transition-colors"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -260,14 +240,16 @@ const Login = () => {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </button>
           </form>
 
           {/* Scoped list context */}
           <div className="mt-8 pt-6 border-t border-dark-border/40 text-left">
-            <h4 className="text-[11px] font-bold text-brand uppercase font-mono tracking-wider mb-2">Access Scopes Details:</h4>
+            <h4 className="text-[11px] font-bold text-brand uppercase font-mono tracking-wider mb-2">
+              Access Scopes Details:
+            </h4>
             <ul className="space-y-1 text-xs text-gray-400 font-mono">
               <li>• Fleet Manager ➔ Fleet, Maintenance</li>
               <li>• Dispatcher ➔ Dashboard, Trips</li>
@@ -276,9 +258,17 @@ const Login = () => {
             </ul>
           </div>
 
+          <div className="mt-5 text-center text-xs text-gray-400">
+            New here?{" "}
+            <Link
+              to="/register"
+              className="text-brand hover:text-brand-light font-mono transition-colors"
+            >
+              Create an account
+            </Link>
+          </div>
         </div>
       </div>
-
     </div>
   );
 };

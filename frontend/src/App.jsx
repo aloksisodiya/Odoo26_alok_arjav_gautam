@@ -1,10 +1,17 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
-import Login from './components/Login';
-import ForgotPassword from './components/ForgotPassword';
-import ResetPassword from './components/ResetPassword';
-import DashboardLayout from './components/DashboardLayout';
+import React, { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useAuthStore } from "./store/authStore";
+import { useThemeStore } from "./store/themeStore";
+import Login from "./components/Login";
+import Register from "./components/Register";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
+import DashboardLayout from "./components/DashboardLayout";
 import {
   DispatcherDashboard,
   TripsManager,
@@ -14,8 +21,8 @@ import {
   ComplianceLogs,
   FuelExpenses,
   AnalyticsDashboard,
-  SystemSettings
-} from './components/RoleDashboards';
+  SystemSettings,
+} from "./components/RoleDashboards";
 
 // Route protection with Role-Based Access Control
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -27,10 +34,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
-      <div className="bg-[#121216] border border-red-500/20 p-8 rounded shadow text-center py-16">
-        <h3 className="text-xl font-bold text-red-400 font-mono tracking-wider uppercase">Access Forbidden</h3>
+      <div className="bg-dark-surface border border-red-500/20 p-8 rounded shadow text-center py-16">
+        <h3 className="text-xl font-bold text-red-400 font-mono tracking-wider uppercase">
+          Access Forbidden
+        </h3>
         <p className="text-xs text-gray-400 mt-3 max-w-md mx-auto">
-          Your active credentials ({user.role}) do not possess permission parameters to read or write in this module. Contact depot admin for settings matrix adjustments.
+          Your active credentials ({user.role}) do not possess permission
+          parameters to read or write in this module. Contact depot admin for
+          settings matrix adjustments.
         </p>
       </div>
     );
@@ -45,13 +56,13 @@ const AuthRedirect = ({ children }) => {
 
   if (token && user) {
     switch (user.role) {
-      case 'FleetManager':
+      case "FleetManager":
         return <Navigate to="/fleet" replace />;
-      case 'Dispatcher':
+      case "Dispatcher":
         return <Navigate to="/dashboard" replace />;
-      case 'SafetyOfficer':
+      case "SafetyOfficer":
         return <Navigate to="/drivers" replace />;
-      case 'FinancialAnalyst':
+      case "FinancialAnalyst":
         return <Navigate to="/expenses" replace />;
       default:
         return <Navigate to="/dashboard" replace />;
@@ -63,143 +74,157 @@ const AuthRedirect = ({ children }) => {
 
 function App() {
   const { checkAuth } = useAuthStore();
+  const theme = useThemeStore((state) => state.theme);
 
   // Validate session token on app load/reload
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const isDark = theme === "dark";
+
+    root.classList.toggle("dark", isDark);
+    root.style.colorScheme = isDark ? "dark" : "light";
+  }, [theme]);
+
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
             <AuthRedirect>
               <Login />
             </AuthRedirect>
-          } 
+          }
         />
-        <Route 
-          path="/forgot-password" 
+        <Route
+          path="/register"
+          element={
+            <AuthRedirect>
+              <Register />
+            </AuthRedirect>
+          }
+        />
+        <Route
+          path="/forgot-password"
           element={
             <AuthRedirect>
               <ForgotPassword />
             </AuthRedirect>
-          } 
+          }
         />
-        <Route 
-          path="/reset-password/:token" 
+        <Route
+          path="/reset-password/:token"
           element={
             <AuthRedirect>
               <ResetPassword />
             </AuthRedirect>
-          } 
+          }
         />
 
         {/* Protected Operational Routes */}
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
-            <ProtectedRoute allowedRoles={['Dispatcher']}>
+            <ProtectedRoute allowedRoles={["Dispatcher"]}>
               <DashboardLayout>
                 <DispatcherDashboard />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/trips" 
+        <Route
+          path="/trips"
           element={
-            <ProtectedRoute allowedRoles={['Dispatcher']}>
+            <ProtectedRoute allowedRoles={["Dispatcher"]}>
               <DashboardLayout>
                 <TripsManager />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/fleet" 
+        <Route
+          path="/fleet"
           element={
-            <ProtectedRoute allowedRoles={['FleetManager']}>
+            <ProtectedRoute allowedRoles={["FleetManager"]}>
               <DashboardLayout>
                 <FleetRegistry />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/maintenance" 
+        <Route
+          path="/maintenance"
           element={
-            <ProtectedRoute allowedRoles={['FleetManager']}>
+            <ProtectedRoute allowedRoles={["FleetManager"]}>
               <DashboardLayout>
                 <MaintenanceLogs />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/drivers" 
+        <Route
+          path="/drivers"
           element={
-            <ProtectedRoute allowedRoles={['SafetyOfficer']}>
+            <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
               <DashboardLayout>
                 <DriverRegistry />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/compliance" 
+        <Route
+          path="/compliance"
           element={
-            <ProtectedRoute allowedRoles={['SafetyOfficer']}>
+            <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
               <DashboardLayout>
                 <ComplianceLogs />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/expenses" 
+        <Route
+          path="/expenses"
           element={
-            <ProtectedRoute allowedRoles={['FinancialAnalyst']}>
+            <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
               <DashboardLayout>
                 <FuelExpenses />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/analytics" 
+        <Route
+          path="/analytics"
           element={
-            <ProtectedRoute allowedRoles={['FinancialAnalyst']}>
+            <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
               <DashboardLayout>
                 <AnalyticsDashboard />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* Settings accessible by all roles, but layout handles navigation */}
-        <Route 
-          path="/settings" 
+        <Route
+          path="/settings"
           element={
             <ProtectedRoute>
               <DashboardLayout>
                 <SystemSettings />
               </DashboardLayout>
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* Catch-all Routing */}
-        <Route 
-          path="*" 
-          element={<Navigate to="/login" replace />} 
-        />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
