@@ -9,7 +9,7 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("Dispatcher");
+  const [role, setRole] = useState("Driver");
   const [rememberMe, setRememberMe] = useState(true);
   const [localError, setLocalError] = useState(null);
 
@@ -44,7 +44,7 @@ const Register = () => {
         case "FleetManager":
           navigate("/fleet");
           break;
-        case "Dispatcher":
+        case "Driver":
           navigate("/dashboard");
           break;
         case "SafetyOfficer":
@@ -228,7 +228,7 @@ const Register = () => {
                   disabled={loading}
                 >
                   <option value="FleetManager">Fleet Manager</option>
-                  <option value="Dispatcher">Dispatcher</option>
+                  <option value="Driver">Driver</option>
                   <option value="SafetyOfficer">Safety Officer</option>
                   <option value="FinancialAnalyst">Financial Analyst</option>
                 </select>

@@ -7,7 +7,7 @@ import ThemeToggle from "./ThemeToggle";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Dispatcher"); // Default matching the wireframe
+  const [role, setRole] = useState("Driver"); // Default matching the wireframe
   const [rememberMe, setRememberMe] = useState(false);
   const [localError, setLocalError] = useState(null);
 
@@ -22,6 +22,34 @@ const Login = () => {
 
   // Combine store and local errors
   const activeError = localError || error;
+
+  const handleRoleQuickSelect = (selectedRole) => {
+    setRole(selectedRole);
+    switch (selectedRole) {
+      case "FleetManager":
+        setEmail("fleet@transitops.com");
+        setPassword("Password123");
+        break;
+      case "Driver":
+        setEmail("driver@transitops.com");
+        setPassword("Password123");
+        break;
+      case "SafetyOfficer":
+        setEmail("safety@transitops.com");
+        setPassword("Password123");
+        break;
+      case "FinancialAnalyst":
+        setEmail("analyst@transitops.com");
+        setPassword("Password123");
+        break;
+      case "Admin":
+        setEmail("admin@transitops.com");
+        setPassword("Password123");
+        break;
+      default:
+        break;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +68,7 @@ const Login = () => {
         case "FleetManager":
           navigate("/fleet");
           break;
-        case "Dispatcher":
+        case "Driver":
           navigate("/dashboard");
           break;
         case "SafetyOfficer":
@@ -84,14 +112,15 @@ const Login = () => {
 
           <div className="mt-16">
             <h2 className="text-xl font-semibold text-white mb-6 font-mono">
-              One login, four roles:
+              One login, multiple roles:
             </h2>
             <ul className="space-y-4">
               {[
                 { name: "Fleet Manager", desc: "Registry & Maintenance" },
-                { name: "Dispatcher", desc: "Dashboard & Trip dispatching" },
+                { name: "Driver", desc: "Creates trips, assigns assets, monitors active deliveries" },
                 { name: "Safety Officer", desc: "Driver safety compliance" },
                 { name: "Financial Analyst", desc: "Expenses & ROI analysis" },
+                { name: "Admin", desc: "Global access to all settings and pages" },
               ].map((item, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand mt-1.5 flex-shrink-0 animate-pulse"></span>
@@ -202,9 +231,10 @@ const Login = () => {
                   disabled={loading}
                 >
                   <option value="FleetManager">Fleet Manager</option>
-                  <option value="Dispatcher">Dispatcher</option>
+                  <option value="Driver">Driver</option>
                   <option value="SafetyOfficer">Safety Officer</option>
                   <option value="FinancialAnalyst">Financial Analyst</option>
+                  <option value="Admin">Admin</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
                   ▼
@@ -252,7 +282,7 @@ const Login = () => {
             </h4>
             <ul className="space-y-1 text-xs text-gray-400 font-mono">
               <li>• Fleet Manager ➔ Fleet, Maintenance</li>
-              <li>• Dispatcher ➔ Dashboard, Trips</li>
+              <li>• Driver ➔ Dashboard, Trips</li>
               <li>• Safety Officer ➔ Drivers, Compliance</li>
               <li>• Financial Analyst ➔ Fuel & Expenses, Analytics</li>
             </ul>
