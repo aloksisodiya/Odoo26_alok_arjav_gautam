@@ -280,7 +280,7 @@ const Login = () => {
             </h4>
             <ul className="space-y-1 text-xs text-gray-400 font-mono">
               <li>• Fleet Manager ➔ Fleet, Maintenance</li>
-              <li>• Driver ➔ Dashboard, Trips</li>
+              <li>• Dispatcher ➔ Dashboard, Trips</li>
               <li>• Safety Officer ➔ Drivers, Compliance</li>
               <li>• Financial Analyst ➔ Fuel & Expenses, Analytics</li>
             </ul>
