@@ -268,9 +268,7 @@ const DashboardLayout = ({ children }) => {
       <header className="h-16 bg-dark-surface border-b border-dark-border px-6 flex items-center justify-between z-10">
         {/* Left Side: Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-brand flex items-center justify-center rounded">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="TransitOps Logo" className="w-8 h-8 object-contain rounded" />
           <span className="text-lg font-bold text-white font-mono tracking-tight">
             TransitOps
           </span>
@@ -296,7 +294,7 @@ const DashboardLayout = ({ children }) => {
 
             {/* ALERTS DROPDOWN */}
             {isAlertsOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-theme-panel border border-dark-border rounded-md shadow-2xl z-50 p-4 space-y-3 font-mono text-xs text-theme-text max-h-[350px] overflow-y-auto">
+              <div className="absolute right-0 mt-2 w-80 glass-panel rounded-xl shadow-2xl z-50 p-4 space-y-3 font-mono text-xs text-theme-text max-h-[350px] overflow-y-auto animate-fade-in">
                 <div className="flex items-center justify-between border-b border-dark-border/40 pb-2">
                   <span className="font-bold text-white uppercase text-[10px]">Active Alerts</span>
                   <button onClick={() => setIsAlertsOpen(false)} className="text-theme-muted hover:text-white">✕</button>
@@ -366,13 +364,13 @@ const DashboardLayout = ({ children }) => {
       {/* BODY WORKSPACE */}
       <div className="flex-1 flex overflow-hidden">
         {/* SIDEBAR NAVIGATION */}
-        <aside className="w-64 bg-theme-panel-alt border-r border-dark-border p-4 flex flex-col justify-between hidden md:flex">
+        <aside className="w-64 bg-theme-panel-alt border-r border-dark-border p-5 flex flex-col justify-between hidden md:flex">
           <div className="space-y-6">
             <div>
-              <span className="text-[10px] text-gray-500 font-mono font-bold uppercase tracking-widest pl-3">
+              <span className="text-xs text-gray-500 font-mono font-bold uppercase tracking-wider pl-3">
                 Authorized Modules
               </span>
-              <nav className="mt-3 space-y-1">
+              <nav className="mt-4 space-y-2">
                 {navLinks.map((link, index) => {
                   const Icon = link.icon;
                   const isActive = location.pathname === link.path;
@@ -380,14 +378,14 @@ const DashboardLayout = ({ children }) => {
                     <Link
                       key={index}
                       to={link.path}
-                      className={`flex items-center gap-3 px-3 py-2 text-xs font-medium rounded transition-colors ${
+                      className={`flex items-center gap-3.5 px-3.5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
                         isActive
-                          ? "bg-brand/10 border-l-2 border-brand text-white font-semibold"
+                          ? "bg-brand/10 border-l-4 border-brand text-white"
                           : "text-gray-400 hover:text-white hover:bg-dark-surface/40"
                       }`}
                     >
                       <Icon
-                        className={`w-4 h-4 ${isActive ? "text-brand" : ""}`}
+                        className={`w-5 h-5 transition-transform duration-200 ${isActive ? "text-brand scale-110" : ""}`}
                       />
                       {link.name}
                     </Link>
@@ -397,13 +395,13 @@ const DashboardLayout = ({ children }) => {
             </div>
           </div>
 
-          <div className="p-3 bg-dark-surface/20 border border-dark-border/40 rounded text-center">
-            <span className="text-[10px] text-gray-500 font-mono">
+          <div className="p-4 bg-dark-surface/20 border border-dark-border/40 rounded-xl text-center">
+            <span className="text-xs text-gray-500 font-mono font-bold uppercase tracking-wider block">
               DEPOT OPERATIONAL STATUS
             </span>
-            <div className="flex items-center justify-center gap-1.5 mt-1">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-[10px] text-gray-400 font-mono">
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-xs text-gray-400 font-mono">
                 DEPOT ACTIVE (127.0.0.1)
               </span>
             </div>

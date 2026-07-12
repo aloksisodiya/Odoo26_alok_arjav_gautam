@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useThemeStore } from "../store/themeStore";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import L from "leaflet";
@@ -435,13 +436,22 @@ export const TripsManager = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
 
+  // Advanced features states
+  const [selectedStops, setSelectedStops] = useState([]);
+  const [optimizedRoute, setOptimizedRoute] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
+
   const mapRef = React.useRef(null);
   const mapInstanceRef = React.useRef(null);
   const pathLayerRef = React.useRef(null);
   const markersRef = React.useRef([]);
   const vehicleMarkerRef = React.useRef(null);
+  const tileLayerRef = React.useRef(null);
+  const tripsLayerGroupRef = React.useRef(null);
 
   const token = useAuthStore((state) => state.token);
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === "dark";
 
   // Depot mapping coords
   const coordsMap = {
@@ -452,6 +462,97 @@ export const TripsManager = () => {
     "South Depot": [22.9000, 72.6000],
     "Gandhinagar Depot": [23.2156, 72.6369],
     "Ahmedabad Hub": [23.0225, 72.5714],
+  };
+
+  const calculateDistance = (coord1, coord2) => {
+    if (!coord1 || !coord2) return 0;
+    const latDiff = coord1[0] - coord2[0];
+    const lngDiff = coord1[1] - coord2[1];
+    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111.32;
+  };
+
+  const generateRoadPath = (src, dest) => {
+    if (!src || !dest) return [];
+    const lat1 = src[0];
+    const lng1 = src[1];
+    const lat2 = dest[0];
+    const lng2 = dest[1];
+    
+    // Render a grid-like urban road structure with intermediate avenue turns
+    const t1 = [lat1 + (lat2 - lat1) * 0.15, lng1 + (lng2 - lng1) * 0.65];
+    const t2 = [lat1 + (lat2 - lat1) * 0.85, lng1 + (lng2 - lng1) * 0.70];
+    const t3 = [lat1 + (lat2 - lat1) * 0.90, lng1 + (lng2 - lng1) * 0.95];
+
+    return [src, t1, t2, t3, dest];
+  };
+
+  const getPointAlongPath = (pathPoints, ratio) => {
+    if (!pathPoints || pathPoints.length === 0) return [23.1000, 72.6000];
+    if (pathPoints.length === 1) return pathPoints[0];
+    if (ratio <= 0) return pathPoints[0];
+    if (ratio >= 1) return pathPoints[pathPoints.length - 1];
+    
+    const totalSegments = pathPoints.length - 1;
+    const segmentIndex = Math.min(
+      Math.floor(ratio * totalSegments),
+      totalSegments - 1
+    );
+    const segmentRatio = (ratio * totalSegments) - segmentIndex;
+    
+    const startNode = pathPoints[segmentIndex];
+    const endNode = pathPoints[segmentIndex + 1];
+    
+    const lat = startNode[0] + (endNode[0] - startNode[0]) * segmentRatio;
+    const lng = startNode[1] + (endNode[1] - startNode[1]) * segmentRatio;
+    
+    return [lat, lng];
+  };
+
+  const handleToggleStop = (stopName) => {
+    if (selectedStops.includes(stopName)) {
+      setSelectedStops(selectedStops.filter(s => s !== stopName));
+    } else {
+      setSelectedStops([...selectedStops, stopName]);
+    }
+  };
+
+  const handleOptimizeStops = () => {
+    if (selectedStops.length < 2) return;
+    const unvisited = [...selectedStops];
+    const path = [];
+    let current = unvisited.shift();
+    path.push(current);
+    
+    let totalDist = 0;
+    while (unvisited.length > 0) {
+      let nearestIndex = 0;
+      let minDistance = Infinity;
+      
+      for (let i = 0; i < unvisited.length; i++) {
+        const dist = calculateDistance(coordsMap[current], coordsMap[unvisited[i]]);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestIndex = i;
+        }
+      }
+      
+      totalDist += minDistance;
+      current = unvisited[nearestIndex];
+      path.push(current);
+      unvisited.splice(nearestIndex, 1);
+    }
+
+    setOptimizedRoute({
+      sequence: path,
+      totalDistance: Math.round(totalDist)
+    });
+  };
+
+  const handleApplyOptimization = () => {
+    if (!optimizedRoute) return;
+    setSource(optimizedRoute.sequence[0]);
+    setDestination(optimizedRoute.sequence[optimizedRoute.sequence.length - 1]);
+    setDistance(optimizedRoute.totalDistance.toString());
   };
 
   // Queries
@@ -496,10 +597,13 @@ export const TripsManager = () => {
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapRef.current).setView([23.1000, 72.6000], 10);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-
+      const initialUrl = isDark 
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+      const attribution = '&copy; OpenStreetMap contributors &copy; CARTO';
+      
+      const tiles = L.tileLayer(initialUrl, { attribution }).addTo(map);
+      tileLayerRef.current = tiles;
       mapInstanceRef.current = map;
       
       // Fix tile misalignment on render
@@ -516,98 +620,257 @@ export const TripsManager = () => {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      tripsLayerGroupRef.current = null;
+      tileLayerRef.current = null;
     };
   }, []);
 
-  // Update map markers when selectedTrip changes
+  // Update map tiles dynamically when theme changes
+  useEffect(() => {
+    if (tileLayerRef.current) {
+      const url = isDark 
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+      tileLayerRef.current.setUrl(url);
+    }
+  }, [isDark]);
+
+  // Update map markers and paths when trips, selectedTrip, or isSimulating changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
-    // Clear existing
-    if (pathLayerRef.current) {
-      mapInstanceRef.current.removeLayer(pathLayerRef.current);
-      pathLayerRef.current = null;
+    // 1. Initialize trips layer group if it doesn't exist
+    if (!tripsLayerGroupRef.current) {
+      tripsLayerGroupRef.current = L.layerGroup().addTo(mapInstanceRef.current);
+    } else {
+      if (!mapInstanceRef.current.hasLayer(tripsLayerGroupRef.current)) {
+        tripsLayerGroupRef.current.addTo(mapInstanceRef.current);
+      }
     }
-    markersRef.current.forEach(m => mapInstanceRef.current.removeLayer(m));
-    markersRef.current = [];
+
+    // 2. Clear all previous layers
+    tripsLayerGroupRef.current.clearLayers();
+
+    // 3. Reset vehicle marker if selected trip changes
     if (vehicleMarkerRef.current) {
       mapInstanceRef.current.removeLayer(vehicleMarkerRef.current);
       vehicleMarkerRef.current = null;
     }
 
-    if (selectedTrip) {
-      const srcName = selectedTrip.source;
-      const destName = selectedTrip.destination;
+    // Helper to get coordinates
+    const getCoords = (locationName) => {
+      if (!locationName) return [23.1000, 72.6000];
+      if (coordsMap[locationName]) return coordsMap[locationName];
+      let hash = 0;
+      for (let i = 0; i < locationName.length; i++) {
+        hash = locationName.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const lat = 23.02 + (Math.abs(hash % 100) / 600);
+      const lng = 72.50 + (Math.abs((hash >> 8) % 100) / 600);
+      return [lat, lng];
+    };
 
-      const srcCoords = coordsMap[srcName] || coordsMap["Depot Alpha"];
-      const destCoords = coordsMap[destName] || coordsMap["Ahmedabad Hub"];
+    // 4. Render all trips and their paths
+    (trips || []).forEach(t => {
+      const srcCoords = getCoords(t.source);
+      const destCoords = getCoords(t.destination);
+      const isSelected = selectedTrip && selectedTrip._id === t._id;
 
+      // Skip cancelled trips to keep view clean
+      if (t.status === "Cancelled") return;
+
+      // Draw Path Line
+      let polylineColor = "#3b82f6"; // standard en-route blue
+      let polylineWeight = 2.5;
+      let opacity = 0.55;
+
+      if (isSelected) {
+        polylineColor = "#ef4444"; // selected route is bright crimson red
+        polylineWeight = 4.5;
+        opacity = 1.0;
+      } else if (t.status === "Completed") {
+        polylineColor = "#10b981"; // completed is light green
+        polylineWeight = 1.5;
+        opacity = 0.25;
+      } else if (t.status === "Draft") {
+        polylineColor = "#f59e0b"; // draft is amber
+        polylineWeight = 2;
+        opacity = 0.45;
+      }
+
+      const roadPath = generateRoadPath(srcCoords, destCoords);
+
+      L.polyline(roadPath, {
+        color: polylineColor,
+        weight: polylineWeight,
+        opacity: opacity
+      }).addTo(tripsLayerGroupRef.current)
+        .bindPopup(`<strong>Trip: ${t.tripId}</strong><br/>Route: ${t.source} ➔ ${t.destination}<br/>Status: <span class="uppercase font-bold">${t.status}</span>`);
+
+      // Start Pin
       const startIcon = L.divIcon({
-        html: `<div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
+        html: `<div style="background-color: ${isSelected ? '#ef4444' : '#10b981'}; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4);"></div>`,
         className: "",
-        iconSize: [12, 12]
+        iconSize: [10, 10]
       });
+      L.marker(srcCoords, { icon: startIcon })
+        .addTo(tripsLayerGroupRef.current)
+        .bindPopup(`Origin: ${t.source}`)
+        .bindTooltip("Start", { permanent: true, direction: "top", className: "ops-tooltip font-mono text-[9px] bg-zinc-900/90 text-green-400 border border-green-500/20 px-1 py-0.5 rounded shadow" });
 
+      // End Pin
       const endIcon = L.divIcon({
-        html: `<div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
+        html: `<div style="background-color: #ef4444; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4);"></div>`,
         className: "",
-        iconSize: [12, 12]
+        iconSize: [10, 10]
       });
+      L.marker(destCoords, { icon: endIcon })
+        .addTo(tripsLayerGroupRef.current)
+        .bindPopup(`Destination: ${t.destination}`)
+        .bindTooltip("End", { permanent: true, direction: "top", className: "ops-tooltip font-mono text-[9px] bg-zinc-900/90 text-red-400 border border-red-500/20 px-1 py-0.5 rounded shadow" });
 
-      const startMarker = L.marker(srcCoords, { icon: startIcon }).addTo(mapInstanceRef.current).bindPopup(`Source: ${srcName}`);
-      const endMarker = L.marker(destCoords, { icon: endIcon }).addTo(mapInstanceRef.current).bindPopup(`Destination: ${destName}`);
-      markersRef.current = [startMarker, endMarker];
+      // Render truck markers for active dispatches
+      if (t.status === "Dispatched") {
+        if (!isSelected) {
+          // Render a static background truck marker placed en-route (35% of the way along the road segments)
+          const midCoords = getPointAlongPath(roadPath, 0.35);
 
-      pathLayerRef.current = L.polyline([srcCoords, destCoords], {
-        color: "#3b82f6",
-        weight: 3,
-        dashArray: "5, 10"
-      }).addTo(mapInstanceRef.current);
+          const staticTruckIcon = L.divIcon({
+            html: `<div style="background-color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); transform: translateY(-5px); z-index: 500;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: block;">
+                <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-7.5l2.25 3H17v-3h1.5z"/>
+              </svg>
+            </div>`,
+            className: "",
+            iconSize: [24, 24]
+          });
 
-      mapInstanceRef.current.fitBounds([srcCoords, destCoords], { padding: [40, 40] });
+          L.marker(midCoords, { icon: staticTruckIcon })
+            .addTo(tripsLayerGroupRef.current)
+            .bindPopup(`<strong>Truck En Route</strong><br/>Asset: ${t.vehicleId?.registrationNo || "Truck"}<br/>Driver: ${t.driverId?.name || "Driver"}<br/>Location: In Transit`);
+        }
+      }
+    });
+
+    // 5. Draw active tracking marker if selected trip is active and simulating
+    if (selectedTrip) {
+      const srcCoords = getCoords(selectedTrip.source);
+      const destCoords = getCoords(selectedTrip.destination);
 
       if (selectedTrip.status === "Dispatched") {
-        const vehicleIcon = L.divIcon({
-          html: `<div style="background-color: #3b82f6; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translateY(-5px); z-index: 1000;" class="animate-bounce">🚚</div>`,
+        const liveTruckIcon = L.divIcon({
+          html: `<div style="background-color: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 2px 6px rgba(0,0,0,0.6); transform: translateY(-5px); z-index: 1000;" class="animate-bounce">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: block;">
+              <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-7.5l2.25 3H17v-3h1.5z"/>
+            </svg>
+          </div>`,
           className: "",
-          iconSize: [22, 22]
+          iconSize: [24, 24]
         });
-        vehicleMarkerRef.current = L.marker(srcCoords, { icon: vehicleIcon }).addTo(mapInstanceRef.current).bindPopup("Truck Tracking Active");
+        
+        const startPos = isSimulating && telemetry ? [Number(telemetry.lat), Number(telemetry.lng)] : srcCoords;
+        
+        vehicleMarkerRef.current = L.marker(startPos, { icon: liveTruckIcon })
+          .addTo(mapInstanceRef.current)
+          .bindPopup("Tracking Active Simulating...");
+      }
+
+      // Zoom to fit the selected trip
+      mapInstanceRef.current.fitBounds([srcCoords, destCoords], { padding: [45, 45] });
+    } else {
+      // Zoom to fit all active paths
+      const boundsCoords = [];
+      (trips || []).forEach(t => {
+        if (t.status === "Dispatched" || t.status === "Draft") {
+          boundsCoords.push(getCoords(t.source));
+          boundsCoords.push(getCoords(t.destination));
+        }
+      });
+
+      if (boundsCoords.length > 0) {
+        mapInstanceRef.current.fitBounds(boundsCoords, { padding: [35, 35] });
+      } else {
+        mapInstanceRef.current.setView([23.1000, 72.6000], 10);
       }
     }
-  }, [selectedTrip]);
+  }, [trips, selectedTrip, isSimulating]);
 
   // GPS Runner animation
-  const handleSimulateGPS = () => {
-    if (!selectedTrip || selectedTrip.status !== "Dispatched" || isSimulating) return;
+  const handleSimulateGPS = (targetTrip = null) => {
+    const tripToSimulate = targetTrip || selectedTrip;
+    if (!tripToSimulate || tripToSimulate.status !== "Dispatched" || isSimulating) return;
 
-    const srcName = selectedTrip.source;
-    const destName = selectedTrip.destination;
-    const srcCoords = coordsMap[srcName] || coordsMap["Depot Alpha"];
-    const destCoords = coordsMap[destName] || coordsMap["Ahmedabad Hub"];
+    // Select the trip so the map centers and focuses on it
+    if (!selectedTrip || selectedTrip._id !== tripToSimulate._id) {
+      setSelectedTrip(tripToSimulate);
+    }
+
+    const srcName = tripToSimulate.source;
+    const destName = tripToSimulate.destination;
+
+    const getCoordsLocal = (locationName) => {
+      if (!locationName) return [23.1000, 72.6000];
+      if (coordsMap[locationName]) return coordsMap[locationName];
+      let hash = 0;
+      for (let i = 0; i < locationName.length; i++) {
+        hash = locationName.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const lat = 23.02 + (Math.abs(hash % 100) / 600);
+      const lng = 72.50 + (Math.abs((hash >> 8) % 100) / 600);
+      return [lat, lng];
+    };
+
+    const srcCoords = getCoordsLocal(srcName);
+    const destCoords = getCoordsLocal(destName);
+    const roadPath = generateRoadPath(srcCoords, destCoords);
 
     setIsSimulating(true);
     setErrorMsg("");
     setSuccessMsg("");
+    
+    // Initialize Telemetry
+    setTelemetry({
+      lat: srcCoords[0].toFixed(5),
+      lng: srcCoords[1].toFixed(5),
+      speed: 0,
+      distanceRemaining: Math.round(tripToSimulate.plannedDistanceKm),
+      etaMins: Math.round(tripToSimulate.plannedDistanceKm * 1.5)
+    });
+
     let step = 0;
     const totalSteps = 40; // 4 seconds
 
     const interval = setInterval(async () => {
       step++;
       const ratio = step / totalSteps;
-      const lat = srcCoords[0] + (destCoords[0] - srcCoords[0]) * ratio;
-      const lng = srcCoords[1] + (destCoords[1] - srcCoords[1]) * ratio;
+      const currentPos = getPointAlongPath(roadPath, ratio);
+      const lat = currentPos[0];
+      const lng = currentPos[1];
 
       if (vehicleMarkerRef.current && mapInstanceRef.current) {
-        vehicleMarkerRef.current.setLatLng([lat, lng]);
-        mapInstanceRef.current.panTo([lat, lng]);
+        vehicleMarkerRef.current.setLatLng(currentPos);
+        mapInstanceRef.current.panTo(currentPos);
       }
+
+      // Update Telemetry values
+      const currentSpeed = ratio >= 0.95 ? 0 : Math.round(50 + Math.random() * 20);
+      const distRemaining = Math.max(0, Math.round(tripToSimulate.plannedDistanceKm * (1 - ratio)));
+      const eta = Math.max(0, Math.round(distRemaining * 1.2));
+      
+      setTelemetry({
+        lat: lat.toFixed(5),
+        lng: lng.toFixed(5),
+        speed: currentSpeed,
+        distanceRemaining: distRemaining,
+        etaMins: eta
+      });
 
       if (step >= totalSteps) {
         clearInterval(interval);
         setIsSimulating(false);
+        setTelemetry(null);
         setSuccessMsg(`Simulated geofence breached! Vehicle entered destination boundary. Trip completed.`);
-        await handleUpdateStatus(selectedTrip._id, "Completed");
+        await handleUpdateStatus(tripToSimulate._id, "Completed");
       }
     }, 100);
   };
@@ -793,155 +1056,236 @@ export const TripsManager = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* CREATE TRIP FORM (col-span-5) */}
-        <div className="lg:col-span-5 bg-theme-panel border border-dark-border p-6 rounded shadow space-y-6">
+        {/* CREATE TRIP & ROUTE OPTIMIZER COLUMN (col-span-5) */}
+        <div className="lg:col-span-5 space-y-6">
           
-          {/* Lifecycle display */}
-          <div className="space-y-2">
-            <span className="text-[10px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Trip Lifecycle</span>
-            <div className="flex items-center justify-between font-mono text-[9px] font-bold text-center bg-dark-bg p-3 border border-dark-border rounded">
-              <span className={`px-2 py-0.5 rounded ${(!selectedTrip || selectedTrip.status === "Draft") ? "bg-brand text-black" : "text-theme-muted"}`}>Draft</span>
-              <span className="text-theme-muted">➔</span>
-              <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Dispatched") ? "bg-blue-500 text-white" : "text-theme-muted"}`}>Dispatched</span>
-              <span className="text-theme-muted">➔</span>
-              <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Completed") ? "bg-green-500 text-white" : "text-theme-muted"}`}>Completed</span>
-              <span className="text-theme-muted">/</span>
-              <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Cancelled") ? "bg-red-500 text-white" : "text-theme-muted"}`}>Cancelled</span>
+          {/* CREATE TRIP FORM */}
+          <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-6">
+            
+            {/* Lifecycle display */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Trip Lifecycle</span>
+              <div className="flex items-center justify-between font-mono text-[9px] font-bold text-center bg-dark-bg p-3 border border-dark-border rounded-lg">
+                <span className={`px-2 py-0.5 rounded ${(!selectedTrip || selectedTrip.status === "Draft") ? "bg-brand text-black" : "text-theme-muted"}`}>Draft</span>
+                <span className="text-theme-muted">➔</span>
+                <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Dispatched") ? "bg-blue-500 text-white" : "text-theme-muted"}`}>Dispatched</span>
+                <span className="text-theme-muted">➔</span>
+                <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Completed") ? "bg-green-500 text-white" : "text-theme-muted"}`}>Completed</span>
+                <span className="text-theme-muted">/</span>
+                <span className={`px-2 py-0.5 rounded ${(selectedTrip && selectedTrip.status === "Cancelled") ? "bg-red-500 text-white" : "text-theme-muted"}`}>Cancelled</span>
+              </div>
+              {selectedTrip && (
+                <div className="flex items-center justify-between text-[10px] font-mono text-brand bg-brand/5 border border-brand/20 p-2 rounded-lg">
+                  <span>Selected: {selectedTrip.tripId} ({selectedTrip.status})</span>
+                  <button 
+                    onClick={() => setSelectedTrip(null)}
+                    className="text-theme-muted hover:text-white"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
             </div>
-            {selectedTrip && (
-              <div className="flex items-center justify-between text-[10px] font-mono text-brand bg-brand/5 border border-brand/20 p-2 rounded">
-                <span>Selected: {selectedTrip.tripId} ({selectedTrip.status})</span>
-                <button 
-                  onClick={() => setSelectedTrip(null)}
-                  className="text-theme-muted hover:text-white"
+
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4 font-mono text-xs">
+              <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wide">Create Trip</h3>
+              
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Source Location</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Gandhinagar Depot"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  className="ops-input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Destination</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ahmedabad Hub"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  className="ops-input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Vehicle (Available Only)</label>
+                <select
+                  value={vehicleId}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                  className="ops-input cursor-pointer"
                 >
-                  Clear Selection
+                  <option value="">Select Available Vehicle</option>
+                  {availableVehicles.map(v => (
+                    <option key={v._id} value={v._id}>
+                      {v.registrationNo} — {v.name} ({v.type}, Cap: {v.capacityKg}kg)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Driver (Available & Licensed)</label>
+                <select
+                  value={driverId}
+                  onChange={(e) => setDriverId(e.target.value)}
+                  className="ops-input cursor-pointer"
+                >
+                  <option value="">Select Available Driver</option>
+                  {availableDrivers.map(d => (
+                    <option key={d._id} value={d._id}>
+                      {d.name} ({d.licenseCategory}, Score: {d.safetyScore}%)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Cargo Weight (kg)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 700"
+                    value={cargoWeight}
+                    onChange={(e) => setCargoWeight(e.target.value)}
+                    className="ops-input"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Planned Distance (km)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 38"
+                    value={distance}
+                    onChange={(e) => setDistance(e.target.value)}
+                    className="ops-input"
+                  />
+                </div>
+              </div>
+
+              {/* Warnings Alert Box */}
+              {selectedVehicle && (
+                <div className={`p-3 border rounded text-[10px] font-semibold leading-relaxed ${capacityExceeded ? "bg-red-950/20 border-red-500/30 text-red-400" : "bg-dark-bg border-dark-border text-theme-muted"}`}>
+                  <div className="flex items-center justify-between">
+                    <span>Vehicle Capacity:</span>
+                    <span className="font-bold">{selectedVehicle.capacityKg} kg</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span>Cargo Weight:</span>
+                    <span className="font-bold">{cargoWeight || 0} kg</span>
+                  </div>
+                  {capacityExceeded && (
+                    <div className="mt-2 border-t border-red-500/20 pt-1.5 font-bold flex items-center gap-1.5 text-[9px] uppercase">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-500 inline-block shrink-0" />
+                      <span>Capacity exceeded by {Number(cargoWeight) - selectedVehicle.capacityKg} kg — Dispatch Blocked</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <button
+                  type="button"
+                  disabled={isDispatchBlocked}
+                  onClick={() => handleCreateTrip("Dispatched")}
+                  className={`py-2 px-4 rounded font-bold uppercase text-[11px] tracking-wide text-center transition-all ${isDispatchBlocked ? "bg-gray-700/30 text-gray-500 border border-gray-600/30 cursor-not-allowed" : "bg-brand text-black hover:bg-brand-light shadow"}`}
+                >
+                  Dispatch
                 </button>
+                <button
+                  type="button"
+                  disabled={!source || !destination || capacityExceeded}
+                  onClick={() => handleCreateTrip("Draft")}
+                  className={`py-2 px-4 rounded font-bold uppercase text-[11px] border tracking-wide text-center transition-all ${(!source || !destination || capacityExceeded) ? "border-gray-700/30 text-gray-500 cursor-not-allowed" : "border-dark-border hover:bg-dark-hoverBg/10 text-white"}`}
+                >
+                  Save Draft
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* ROUTE OPTIMIZER WIDGET */}
+          <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-4 font-mono text-xs">
+            <div>
+              <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wide flex items-center gap-2">
+                🧭 Multi-Stop Route Optimizer
+              </h3>
+              <p className="text-[10px] text-theme-muted mt-1 font-mono">
+                Select stops to compute the shortest sequence path.
+              </p>
+            </div>
+
+            <div className="space-y-2 border-t border-dark-border/40 pt-3">
+              <span className="text-[10px] text-theme-muted uppercase font-bold block mb-1">Available Waypoints</span>
+              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-gray-300">
+                {Object.keys(coordsMap).map(stop => (
+                  <label key={stop} className="flex items-center gap-2 cursor-pointer bg-dark-bg border border-dark-border/60 hover:border-brand/40 px-2 py-1.5 rounded transition-all">
+                    <input 
+                      type="checkbox"
+                      checked={selectedStops.includes(stop)}
+                      onChange={() => handleToggleStop(stop)}
+                      className="rounded bg-theme-panel border-dark-border text-brand focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5 cursor-pointer"
+                    />
+                    <span className="truncate">{stop}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={handleOptimizeStops}
+                disabled={selectedStops.length < 2}
+                className={`flex-1 py-2 px-3 rounded font-bold uppercase text-[10px] tracking-wide text-center transition-all ${selectedStops.length < 2 ? "bg-gray-700/30 text-gray-500 border border-gray-600/30 cursor-not-allowed" : "bg-brand text-black hover:bg-brand-light shadow"}`}
+              >
+                Compute Optimal TSP Path
+              </button>
+              {selectedStops.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStops([]); setOptimizedRoute(null); }}
+                  className="border border-dark-border px-3 py-2 text-white hover:bg-dark-hoverBg/10 rounded uppercase text-[10px] font-bold"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {optimizedRoute && (
+              <div className="bg-brand/5 border border-brand/20 p-3 rounded space-y-2 animate-fade-in text-[10px] leading-relaxed">
+                <div>
+                  <span className="text-brand font-bold uppercase tracking-wider block text-[9px]">Optimal Itinerary Calculated</span>
+                  <div className="mt-1 space-y-1">
+                    {optimizedRoute.sequence.map((stop, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 text-white">
+                        <span className="w-4 h-4 bg-brand/20 border border-brand/40 text-brand text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span>{stop}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center border-t border-brand/25 pt-2">
+                  <span className="text-gray-300">Total Run Distance: <strong className="text-white">{optimizedRoute.totalDistance} km</strong></span>
+                  <button
+                    type="button"
+                    onClick={handleApplyOptimization}
+                    className="bg-brand text-black font-bold uppercase px-2.5 py-1 rounded text-[9px] hover:bg-brand-light transition-all"
+                  >
+                    Apply Path Parameters
+                  </button>
+                </div>
               </div>
             )}
           </div>
-
-          <form onSubmit={(e) => e.preventDefault()} className="space-y-4 font-mono text-xs">
-            <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wide">Create Trip</h3>
-            
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Source Location</label>
-              <input
-                type="text"
-                placeholder="e.g. Gandhinagar Depot"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                className="ops-input"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Destination</label>
-              <input
-                type="text"
-                placeholder="e.g. Ahmedabad Hub"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                className="ops-input"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Vehicle (Available Only)</label>
-              <select
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                className="ops-input cursor-pointer"
-              >
-                <option value="">Select Available Vehicle</option>
-                {availableVehicles.map(v => (
-                  <option key={v._id} value={v._id}>
-                    {v.registrationNo} — {v.name} ({v.type}, Cap: {v.capacityKg}kg)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Driver (Available & Licensed)</label>
-              <select
-                value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                className="ops-input cursor-pointer"
-              >
-                <option value="">Select Available Driver</option>
-                {availableDrivers.map(d => (
-                  <option key={d._id} value={d._id}>
-                    {d.name} ({d.licenseCategory}, Score: {d.safetyScore}%)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="block text-[10px] text-theme-muted uppercase font-bold">Cargo Weight (kg)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 700"
-                  value={cargoWeight}
-                  onChange={(e) => setCargoWeight(e.target.value)}
-                  className="ops-input"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <label className="block text-[10px] text-theme-muted uppercase font-bold">Planned Distance (km)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 38"
-                  value={distance}
-                  onChange={(e) => setDistance(e.target.value)}
-                  className="ops-input"
-                />
-              </div>
-            </div>
-
-            {/* Warnings Alert Box */}
-            {selectedVehicle && (
-              <div className={`p-3 border rounded text-[10px] font-semibold leading-relaxed ${capacityExceeded ? "bg-red-950/20 border-red-500/30 text-red-400" : "bg-dark-bg border-dark-border text-theme-muted"}`}>
-                <div className="flex items-center justify-between">
-                  <span>Vehicle Capacity:</span>
-                  <span className="font-bold">{selectedVehicle.capacityKg} kg</span>
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span>Cargo Weight:</span>
-                  <span className="font-bold">{cargoWeight || 0} kg</span>
-                </div>
-                {capacityExceeded && (
-                  <div className="mt-2 border-t border-red-500/20 pt-1.5 font-bold flex items-center gap-1.5 text-[9px] uppercase">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-500 inline-block shrink-0" />
-                    <span>Capacity exceeded by {Number(cargoWeight) - selectedVehicle.capacityKg} kg — Dispatch Blocked</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Buttons */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <button
-                type="button"
-                disabled={isDispatchBlocked}
-                onClick={() => handleCreateTrip("Dispatched")}
-                className={`py-2 px-4 rounded font-bold uppercase text-[11px] tracking-wide text-center transition-all ${isDispatchBlocked ? "bg-gray-700/30 text-gray-500 border border-gray-600/30 cursor-not-allowed" : "bg-brand text-black hover:bg-brand-light shadow"}`}
-              >
-                Dispatch
-              </button>
-              <button
-                type="button"
-                disabled={!source || !destination || capacityExceeded}
-                onClick={() => handleCreateTrip("Draft")}
-                className={`py-2 px-4 rounded font-bold uppercase text-[11px] border tracking-wide text-center transition-all ${(!source || !destination || capacityExceeded) ? "border-gray-700/30 text-gray-500 cursor-not-allowed" : "border-dark-border hover:bg-dark-hoverBg/10 text-white"}`}
-              >
-                Save Draft
-              </button>
-            </div>
-          </form>
         </div>
 
         {/* MAP & LIVE BOARD (col-span-7) */}
@@ -969,12 +1313,39 @@ export const TripsManager = () => {
               )}
             </div>
             
-            {/* Map Canvas */}
-            <div 
-              ref={mapRef} 
-              className="h-64 w-full bg-dark-bg border border-dark-border rounded overflow-hidden z-10"
-              style={{ minHeight: "260px" }}
-            ></div>
+            {/* Map Canvas with Telemetry Overlay */}
+            <div className="relative">
+              <div 
+                ref={mapRef} 
+                className="h-[400px] w-full bg-dark-bg border border-dark-border rounded-lg overflow-hidden z-10"
+                style={{ minHeight: "400px" }}
+              ></div>
+
+              {/* TELEMETRY OVERLAY */}
+              {isSimulating && telemetry && (
+                <div className="absolute bottom-4 left-4 right-4 glass-panel p-4 rounded-xl z-20 text-[10px] text-gray-300 font-mono shadow-2xl animate-fade-in flex flex-wrap justify-between items-center gap-3">
+                  <div>
+                    <span className="text-brand font-bold uppercase tracking-wider block text-[9px] mb-1 animate-pulse">🛰️ Active GPS Telemetry</span>
+                    <span className="block text-white font-semibold">Position: {telemetry.lat}, {telemetry.lng}</span>
+                    <span className="text-[9px] text-theme-muted block mt-0.5">Asset: {selectedTrip.vehicleId?.registrationNo || "Truck"} ({selectedTrip.driverId?.name || "Driver"})</span>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="text-center">
+                      <span className="text-theme-muted block text-[8px] uppercase">Speed</span>
+                      <span className="text-white font-bold text-sm block mt-0.5">{telemetry.speed} <span className="text-[9px] font-normal">km/h</span></span>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-theme-muted block text-[8px] uppercase">Remaining</span>
+                      <span className="text-white font-bold text-sm block mt-0.5">{telemetry.distanceRemaining} <span className="text-[9px] font-normal">km</span></span>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-theme-muted block text-[8px] uppercase">ETA</span>
+                      <span className="text-white font-bold text-sm block mt-0.5">{telemetry.etaMins} <span className="text-[9px] font-normal">mins</span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* LIVE BOARD */}
@@ -1048,14 +1419,21 @@ export const TripsManager = () => {
                         {trip.status === "Dispatched" && (
                           <>
                             <button
+                              onClick={(e) => { e.stopPropagation(); handleSimulateGPS(trip); }}
+                              disabled={isSimulating}
+                              className={`bg-brand text-black font-bold px-2 py-1.5 rounded text-[9px] uppercase font-mono tracking-wide transition-colors flex items-center gap-0.5 ${isSimulating ? 'opacity-55 cursor-not-allowed' : 'hover:bg-brand-light'}`}
+                            >
+                              <Play className="w-3 h-3" /> Simulate
+                            </button>
+                            <button
                               onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Completed"); }}
-                              className="bg-green-600 hover:bg-green-500 text-white font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
+                              className="bg-green-600 hover:bg-green-500 text-white font-bold px-2 py-1.5 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
                             >
                               Complete
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Cancelled"); }}
-                              className="bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-400 font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
+                              className="bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-400 font-bold px-2 py-1.5 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
                             >
                               Cancel
                             </button>
@@ -1809,6 +2187,12 @@ export const MaintenanceLogs = () => {
     }
   };
 
+  const predictiveAlerts = (vehicles || []).filter(v => {
+    if (v.status === "Retired" || v.status === "InShop") return false;
+    const remainder = v.odometerKm % 10000;
+    return remainder >= 9000 || remainder <= 1000;
+  });
+
   return (
     <div className="space-y-6 text-theme-text">
       <div>
@@ -1829,98 +2213,142 @@ export const MaintenanceLogs = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* LOG SERVICE RECORD FORM (col-span-5) */}
-        <div className="lg:col-span-5 bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
-          <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wide">Log Service Record</h3>
+        {/* LOG SERVICE RECORD & PREDICTIVE ALERTS COLUMN (col-span-5) */}
+        <div className="lg:col-span-5 space-y-6">
           
-          <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs">
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Vehicle</label>
-              <select
-                value={selectedVehicle}
-                onChange={(e) => setSelectedVehicle(e.target.value)}
-                className="ops-input cursor-pointer"
-                required
-              >
-                <option value="">Select Vehicle</option>
-                {(vehicles || []).map(v => (
-                  <option key={v._id} value={v._id}>{v.registrationNo} — {v.name} ({v.status})</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Service Type</label>
-              <input
-                type="text"
-                placeholder="e.g. Oil Change / Engine Repair"
-                value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                className="ops-input"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          {/* LOG SERVICE RECORD FORM */}
+          <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-4">
+            <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wide">Log Service Record</h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs">
               <div className="space-y-1">
-                <label className="block text-[10px] text-theme-muted uppercase font-bold">Cost (₹)</label>
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Vehicle</label>
+                <select
+                  value={selectedVehicle}
+                  onChange={(e) => setSelectedVehicle(e.target.value)}
+                  className="ops-input cursor-pointer"
+                  required
+                >
+                  <option value="">Select Vehicle</option>
+                  {(vehicles || []).map(v => (
+                    <option key={v._id} value={v._id}>{v.registrationNo} — {v.name} ({v.status})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Service Type</label>
                 <input
-                  type="number"
-                  placeholder="e.g. 2500"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
+                  type="text"
+                  placeholder="e.g. Oil Change / Engine Repair"
+                  value={serviceType}
+                  onChange={(e) => setServiceType(e.target.value)}
                   className="ops-input"
                   required
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Cost (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 2500"
+                    value={cost}
+                    onChange={(e) => setCost(e.target.value)}
+                    className="ops-input"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] text-theme-muted uppercase font-bold">Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="ops-input cursor-pointer"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1">
-                <label className="block text-[10px] text-theme-muted uppercase font-bold">Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                <label className="block text-[10px] text-theme-muted uppercase font-bold">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
                   className="ops-input cursor-pointer"
-                />
+                >
+                  <option value="Active">Active (In Shop)</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-brand text-black font-bold uppercase py-2 rounded hover:bg-brand-light tracking-wide text-[11px] mt-2 transition-colors"
+              >
+                Save Record
+              </button>
+            </form>
+
+            {/* Service transition rules */}
+            <div className="border-t border-dark-border/40 pt-4 space-y-1 font-mono text-[9px] text-theme-muted leading-relaxed uppercase">
+              <div className="flex justify-between items-center text-green-500/80 font-bold">
+                <span>Available</span>
+                <span>➔ (Open log) ➔</span>
+                <span>In Shop</span>
+              </div>
+              <div className="flex justify-between items-center text-blue-400 font-bold">
+                <span>In Shop</span>
+                <span>➔ (Mark Completed) ➔</span>
+                <span>Available</span>
+              </div>
+              <p className="text-[8px] text-center text-red-400 font-semibold mt-2">
+                Note: In Shop vehicles are removed from the dispatch pool.
+              </p>
+            </div>
+          </div>
+
+          {/* PREDICTIVE ALERTS */}
+          {predictiveAlerts.length > 0 && (
+            <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-4 font-mono text-xs animate-fade-in">
+              <h3 className="text-sm font-bold uppercase text-white tracking-wide flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" /> Predictive Alerts
+              </h3>
+              <p className="text-[10px] text-theme-muted font-mono leading-relaxed">
+                Vehicles approaching scheduled 10,000 km maintenance milestones:
+              </p>
+              
+              <div className="space-y-3">
+                {predictiveAlerts.map(v => {
+                  const nextMilestone = Math.ceil(v.odometerKm / 10000) * 10000;
+                  const kmRemaining = Math.max(0, nextMilestone - v.odometerKm);
+                  return (
+                    <div key={v._id} className="flex justify-between items-center bg-amber-950/10 border border-amber-500/20 p-3 rounded-lg">
+                      <div>
+                        <span className="font-bold text-white block">{v.registrationNo} — {v.name}</span>
+                        <span className="text-[9px] text-amber-400 block mt-0.5 font-bold">
+                          Odometer: {v.odometerKm.toLocaleString()} km ({kmRemaining.toLocaleString()} km to target {nextMilestone.toLocaleString()} km)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedVehicle(v._id);
+                          setServiceType("Scheduled Odometer Maintenance");
+                          setCost("4500");
+                        }}
+                        className="bg-brand text-black font-bold uppercase text-[9px] px-2.5 py-1 rounded hover:bg-brand-light transition-all"
+                      >
+                        Log Ticket
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] text-theme-muted uppercase font-bold">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="ops-input cursor-pointer"
-              >
-                <option value="Active">Active (In Shop)</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-brand text-black font-bold uppercase py-2 rounded hover:bg-brand-light tracking-wide text-[11px] mt-2 transition-colors"
-            >
-              Save Record
-            </button>
-          </form>
-
-          {/* Service transition rules */}
-          <div className="border-t border-dark-border/40 pt-4 space-y-1 font-mono text-[9px] text-theme-muted leading-relaxed uppercase">
-            <div className="flex justify-between items-center text-green-500/80 font-bold">
-              <span>Available</span>
-              <span>➔ (Open log) ➔</span>
-              <span>In Shop</span>
-            </div>
-            <div className="flex justify-between items-center text-blue-400 font-bold">
-              <span>In Shop</span>
-              <span>➔ (Mark Completed) ➔</span>
-              <span>Available</span>
-            </div>
-            <p className="text-[8px] text-center text-red-400 font-semibold mt-2">
-              Note: In Shop vehicles are removed from the dispatch pool.
-            </p>
-          </div>
+          )}
         </div>
 
         {/* SERVICE LOGS TABLE (col-span-7) */}
@@ -2381,6 +2809,8 @@ export const DriverRegistry = () => {
 // 6. Safety Officer component: Compliance
 export const ComplianceLogs = () => {
   const token = useAuthStore((state) => state.token);
+  const [approvedDrivers, setApprovedDrivers] = useState([]);
+  const [approvedVehicles, setApprovedVehicles] = useState([]);
 
   const { data: drivers, isLoading: driversLoading } = useQuery({
     queryKey: ["complianceDrivers"],
@@ -2447,76 +2877,147 @@ export const ComplianceLogs = () => {
     return repairsCost >= (v.acquisitionCost || 0) * 0.5;
   });
 
-  const totalComplianceScore = Math.max(0, 100 - (expiredDrivers.length * 15) - (expiringSoonDrivers.length * 5) - (lowSafetyDrivers.length * 10));
+  const unapprovedDriversCount = expiredDrivers.filter(d => !approvedDrivers.includes(d._id)).length +
+                                 expiringSoonDrivers.filter(d => !approvedDrivers.includes(d._id)).length +
+                                 lowSafetyDrivers.filter(d => !approvedDrivers.includes(d._id)).length;
+  
+  const unapprovedVehiclesCount = depreciationAlertVehicles.filter(v => !approvedVehicles.includes(v._id)).length;
+
+  const totalComplianceScore = Math.max(0, 100 - 
+    (expiredDrivers.filter(d => !approvedDrivers.includes(d._id)).length * 15) - 
+    (expiringSoonDrivers.filter(d => !approvedDrivers.includes(d._id)).length * 5) - 
+    (lowSafetyDrivers.filter(d => !approvedDrivers.includes(d._id)).length * 10) -
+    (depreciationAlertVehicles.filter(v => !approvedVehicles.includes(v._id)).length * 10)
+  );
 
   return (
     <div className="space-y-6 text-theme-text font-mono text-xs">
       <div>
         <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Compliance & Safety Engine</h2>
-        <p className="text-[10px] text-theme-muted mt-1 font-mono">Auto-generated audit reports, driver credentials monitoring, and asset depreciation flags.</p>
+        <p className="text-[10px] text-theme-muted mt-1 font-mono">Auto-generated audit reports, driver credentials monitoring, and asset waiver flags.</p>
       </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow">
           <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Compliance Index</span>
           <span className={`text-2xl font-bold block mt-1 ${totalComplianceScore > 80 ? 'text-green-400' : totalComplianceScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>{totalComplianceScore}%</span>
           <span className="text-[8px] text-theme-muted block mt-2">Overall fleet status score</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-red-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-red-500">
           <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expired Licenses</span>
-          <span className="text-2xl font-bold block mt-1 text-red-400">{expiredDrivers.length}</span>
-          <span className="text-[8px] text-theme-muted block mt-2">Dispatch blocked drivers</span>
+          <span className="text-2xl font-bold block mt-1 text-red-400">
+            {expiredDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
+          </span>
+          <span className="text-[8px] text-theme-muted block mt-2">Active blocked dispatches</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-amber-500">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-amber-500">
           <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Expiring Licenses</span>
-          <span className="text-2xl font-bold block mt-1 text-amber-400">{expiringSoonDrivers.length}</span>
+          <span className="text-2xl font-bold block mt-1 text-amber-400">
+            {expiringSoonDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
+          </span>
           <span className="text-[8px] text-theme-muted block mt-2">Expires within 30 days</span>
         </div>
 
-        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow border-l-2 border-l-brand">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded-xl shadow border-l-2 border-l-brand">
           <span className="text-[9px] text-theme-muted font-bold block uppercase tracking-wider">Critical Safety</span>
-          <span className="text-2xl font-bold block mt-1 text-brand">{lowSafetyDrivers.length}</span>
+          <span className="text-2xl font-bold block mt-1 text-brand">
+            {lowSafetyDrivers.filter(d => !approvedDrivers.includes(d._id)).length}
+          </span>
           <span className="text-[8px] text-theme-muted block mt-2">Safety Score &lt; 85%</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* DRIVERS CRITICAL COMPLIANCE */}
-        <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
+        <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-red-500" /> Driver Credentials Verification
           </h3>
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-            {expiredDrivers.map(d => (
-              <div key={d._id} className="flex justify-between items-center bg-red-950/20 border border-red-500/30 p-2.5 rounded">
-                <div>
-                  <span className="font-bold text-white block">{d.name}</span>
-                  <span className="text-[10px] text-red-400 font-bold block mt-0.5">LICENSE EXPIRED ({new Date(d.licenseExpiry).toLocaleDateString()})</span>
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            {expiredDrivers.map(d => {
+              const isApproved = approvedDrivers.includes(d._id);
+              return (
+                <div key={d._id} className={`flex justify-between items-center p-2.5 rounded-lg border transition-all ${isApproved ? 'bg-green-950/10 border-green-500/20' : 'bg-red-950/20 border-red-500/30'}`}>
+                  <div>
+                    <span className="font-bold text-white block">{d.name}</span>
+                    <span className={`text-[10px] font-bold block mt-0.5 ${isApproved ? 'text-green-400' : 'text-red-400'}`}>
+                      {isApproved ? "VERIFIED WAIVER APPROVED" : `LICENSE EXPIRED (${new Date(d.licenseExpiry).toLocaleDateString()})`}
+                    </span>
+                  </div>
+                  {isApproved ? (
+                    <span className="ops-badge-success uppercase text-[8px]">Waived</span>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setApprovedDrivers([...approvedDrivers, d._id])}
+                        className="bg-brand text-black font-bold uppercase text-[9px] px-2 py-1 rounded hover:bg-brand-light transition-all"
+                      >
+                        Verify Waiver
+                      </button>
+                      <span className="ops-badge-danger uppercase text-[8px]">Blocked</span>
+                    </div>
+                  )}
                 </div>
-                <span className="ops-badge-danger">BLOCKED</span>
-              </div>
-            ))}
-            {expiringSoonDrivers.map(d => (
-              <div key={d._id} className="flex justify-between items-center bg-amber-950/20 border border-amber-500/30 p-2.5 rounded">
-                <div>
-                  <span className="font-bold text-white block">{d.name}</span>
-                  <span className="text-[10px] text-amber-400 block mt-0.5">Expires soon on {new Date(d.licenseExpiry).toLocaleDateString()}</span>
+              );
+            })}
+            
+            {expiringSoonDrivers.map(d => {
+              const isApproved = approvedDrivers.includes(d._id);
+              return (
+                <div key={d._id} className={`flex justify-between items-center p-2.5 rounded-lg border transition-all ${isApproved ? 'bg-green-950/10 border-green-500/20' : 'bg-amber-950/20 border-amber-500/30'}`}>
+                  <div>
+                    <span className="font-bold text-white block">{d.name}</span>
+                    <span className={`text-[10px] block mt-0.5 ${isApproved ? 'text-green-400' : 'text-amber-400'}`}>
+                      {isApproved ? "RENEWAL SCHEDULE VERIFIED" : `Expires soon on ${new Date(d.licenseExpiry).toLocaleDateString()}`}
+                    </span>
+                  </div>
+                  {isApproved ? (
+                    <span className="ops-badge-success uppercase text-[8px]">Waived</span>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setApprovedDrivers([...approvedDrivers, d._id])}
+                        className="bg-brand text-black font-bold uppercase text-[9px] px-2 py-1 rounded hover:bg-brand-light transition-all"
+                      >
+                        Approve
+                      </button>
+                      <span className="ops-badge-warning uppercase text-[8px]">Renew</span>
+                    </div>
+                  )}
                 </div>
-                <span className="ops-badge-warning">RENEW NOW</span>
-              </div>
-            ))}
-            {lowSafetyDrivers.map(d => (
-              <div key={d._id} className="flex justify-between items-center bg-dark-surface border border-dark-border p-2.5 rounded">
-                <div>
-                  <span className="font-bold text-white block">{d.name}</span>
-                  <span className="text-[10px] text-brand font-bold block mt-0.5">SAFETY RATING: {d.safetyScore}%</span>
+              );
+            })}
+
+            {lowSafetyDrivers.map(d => {
+              const isApproved = approvedDrivers.includes(d._id);
+              return (
+                <div key={d._id} className={`flex justify-between items-center p-2.5 rounded-lg border transition-all ${isApproved ? 'bg-green-950/10 border-green-500/20' : 'bg-dark-surface border-dark-border'}`}>
+                  <div>
+                    <span className="font-bold text-white block">{d.name}</span>
+                    <span className={`text-[10px] font-bold block mt-0.5 ${isApproved ? 'text-green-400' : 'text-brand'}`}>
+                      {isApproved ? "MONITORING LOGS UPDATED" : `SAFETY RATING: ${d.safetyScore}%`}
+                    </span>
+                  </div>
+                  {isApproved ? (
+                    <span className="ops-badge-success uppercase text-[8px]">Waived</span>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setApprovedDrivers([...approvedDrivers, d._id])}
+                        className="bg-brand text-black font-bold uppercase text-[9px] px-2 py-1 rounded hover:bg-brand-light transition-all"
+                      >
+                        Verify Roster
+                      </button>
+                      <span className="ops-badge-danger uppercase text-[8px]">Monitor</span>
+                    </div>
+                  )}
                 </div>
-                <span className="ops-badge-danger uppercase text-[9px]">Monitor</span>
-              </div>
-            ))}
+              );
+            })}
+
             {expiredDrivers.length === 0 && expiringSoonDrivers.length === 0 && lowSafetyDrivers.length === 0 && (
               <div className="py-12 text-center text-theme-muted">All active drivers are fully compliant.</div>
             )}
@@ -2524,20 +3025,35 @@ export const ComplianceLogs = () => {
         </div>
 
         {/* VEHICLE DEPRECIATION & FLEET INTEGRITY */}
-        <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
+        <div className="bg-theme-panel border border-dark-border p-6 rounded-xl shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
             <Truck className="w-4 h-4 text-brand" /> Vehicle Depreciation & Cost Warnings
           </h3>
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
             {depreciationAlertVehicles.map(v => {
               const repairs = maintenanceCosts[v._id] || 0;
+              const isApproved = approvedVehicles.includes(v._id);
               return (
-                <div key={v._id} className="flex justify-between items-center bg-red-950/20 border border-red-500/30 p-2.5 rounded">
+                <div key={v._id} className={`flex justify-between items-center p-2.5 rounded-lg border transition-all ${isApproved ? 'bg-green-950/10 border-green-500/20' : 'bg-red-950/20 border-red-500/30'}`}>
                   <div>
                     <span className="font-bold text-white block">{v.registrationNo} — {v.name}</span>
-                    <span className="text-[10px] text-red-400 block mt-0.5">Repairs (₹{repairs.toLocaleString()}) &gt;= 50% cost (₹{v.acquisitionCost.toLocaleString()})</span>
+                    <span className={`text-[10px] block mt-0.5 ${isApproved ? 'text-green-400' : 'text-red-400'}`}>
+                      {isApproved ? "DEPRECIATION AMORTIZATION APPROVED" : `Repairs (₹${repairs.toLocaleString()}) >= 50% cost (₹${v.acquisitionCost.toLocaleString()})`}
+                    </span>
                   </div>
-                  <span className="ops-badge-danger">DEPRECIATED</span>
+                  {isApproved ? (
+                    <span className="ops-badge-success uppercase text-[8px]">Waived</span>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setApprovedVehicles([...approvedVehicles, v._id])}
+                        className="bg-brand text-black font-bold uppercase text-[9px] px-2 py-1 rounded hover:bg-brand-light transition-all"
+                      >
+                        Verify Costs
+                      </button>
+                      <span className="ops-badge-danger uppercase text-[8px]">Depreciated</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -3232,7 +3748,7 @@ export const AnalyticsDashboard = () => {
           
           <div className="h-56 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
+              <AreaChart
                 data={[
                   { month: "Jan", Revenue: 55000 },
                   { month: "Feb", Revenue: 70000 },
@@ -3244,12 +3760,18 @@ export const AnalyticsDashboard = () => {
                 ]}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.45}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" strokeOpacity={0.3} />
                 <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickLine={false} />
                 <YAxis stroke="#71717a" fontSize={10} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", fontSize: "10px" }} />
-                <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Tooltip contentStyle={{ backgroundColor: "#141519", borderColor: "#23252a", fontSize: "10px", borderRadius: "8px" }} />
+                <Area type="monotone" dataKey="Revenue" stroke="#ef4444" strokeWidth={3.5} fillOpacity={1} fill="url(#colorRevenue)" />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>

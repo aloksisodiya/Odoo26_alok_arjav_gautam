@@ -5,9 +5,9 @@ import { Shield, Lock, Mail, Users, AlertTriangle } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Driver"); // Default matching the wireframe
+  const [email, setEmail] = useState("admin@transitops.com");
+  const [password, setPassword] = useState("Password123");
+  const [role, setRole] = useState("Admin"); // Auto-filled for testing
   const [rememberMe, setRememberMe] = useState(false);
   const [localError, setLocalError] = useState(null);
 
@@ -97,9 +97,7 @@ const Login = () => {
         <div>
           {/* Logo Brand */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand flex items-center justify-center rounded shadow-lg shadow-brand/30">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
+            <img src="/logo.png" alt="TransitOps Logo" className="w-10 h-10 object-contain rounded" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white font-mono">
                 TransitOps

@@ -57,9 +57,7 @@ const ForgotPassword = () => {
       <div className="w-full max-w-md bg-dark-surface/90 border border-dark-border p-8 rounded shadow-2xl backdrop-blur-md">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-8 h-8 bg-brand flex items-center justify-center rounded">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="TransitOps Logo" className="w-8 h-8 object-contain rounded" />
           <span className="text-xl font-bold tracking-tight text-white font-mono">
             TransitOps
           </span>

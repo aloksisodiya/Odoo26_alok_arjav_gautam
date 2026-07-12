@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,34 +7,34 @@
 @layer base {
   :root {
     color-scheme: light;
-    --color-bg: #f5f7fb;
-    --color-surface: #ffffff;
-    --color-border: #d7deea;
+    --color-bg: #f4f4f0; /* Cream background from Image 2 */
+    --color-surface: #ffffff; /* White panels */
+    --color-border: #e2e2de; /* Subtle border */
     --color-card-bg: #ffffff;
-    --color-hover-bg: #e9eef7;
-    --color-muted-text: #64748b;
-    --color-text: #0f172a;
+    --color-hover-bg: #ebebe5; /* Warm grey/cream hover */
+    --color-muted-text: #70706b; /* Muted text */
+    --color-text: #1a1a18; /* Dark charcoal text */
     --color-panel: #ffffff;
-    --color-panel-alt: #f1f5f9;
-    --color-brand: #d97706;
-    --color-brand-light: #f59e0b;
-    --color-brand-dark: #b45309;
+    --color-panel-alt: #eaeae5;
+    --color-brand: #e22e2e; /* Sleek Crimson Red brand color */
+    --color-brand-light: #ef4444;
+    --color-brand-dark: #b91c1c;
   }
 
   html.dark {
     color-scheme: dark;
-    --color-bg: #0a0a0c;
-    --color-surface: #121216;
-    --color-border: #22222a;
-    --color-card-bg: #16161a;
-    --color-hover-bg: #1e1e24;
-    --color-muted-text: #8e8e9f;
-    --color-text: #f3f4f6;
-    --color-panel: #121216;
-    --color-panel-alt: #0d0d10;
-    --color-brand: #d97706;
-    --color-brand-light: #fbbf24;
-    --color-brand-dark: #b45309;
+    --color-bg: #0b0c0e; /* Charcoal black background from Image 1 */
+    --color-surface: #141519; /* Lighter charcoal panels */
+    --color-border: #23252a; /* Dark border */
+    --color-card-bg: #141519;
+    --color-hover-bg: #2a2c32; /* Hover state */
+    --color-muted-text: #9ca3af; /* Muted text */
+    --color-text: #f3f4f6; /* Off-white text */
+    --color-panel: #141519;
+    --color-panel-alt: #1e2025;
+    --color-brand: #ef4444; /* Bright Crimson Red brand color */
+    --color-brand-light: #fca5a5;
+    --color-brand-dark: #991b1b;
   }
 
   html:not(.dark) body {
@@ -49,19 +49,19 @@
   }
 
   html:not(.dark) .text-gray-300 {
-    color: #334155 !important;
+    color: #3f3f46 !important;
   }
 
   html:not(.dark) .text-gray-400 {
-    color: #64748b !important;
+    color: #71717a !important;
   }
 
   html:not(.dark) .text-gray-500 {
-    color: #94a3b8 !important;
+    color: #a1a1aa !important;
   }
 
   html:not(.dark) .text-gray-600 {
-    color: #94a3b8 !important;
+    color: #a1a1aa !important;
   }
 
   html:not(.dark) .border-dark-border {
@@ -103,33 +103,33 @@
 @layer components {
   /* Custom dark-themed inputs */
   .ops-input {
-    @apply w-full bg-theme-panel border border-dark-border text-theme-text rounded px-3 py-2 text-sm focus:outline-none focus:border-brand transition-colors placeholder:text-theme-muted;
+    @apply w-full bg-theme-panel border border-dark-border text-theme-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand transition-colors placeholder:text-theme-muted shadow-sm;
   }
 
   /* Custom button states */
   .ops-btn-primary {
-    @apply w-full bg-brand hover:bg-brand-dark text-white rounded font-medium py-2.5 px-4 text-sm transition-colors duration-200 shadow-md active:translate-y-[1px];
+    @apply w-full bg-brand hover:bg-brand-dark text-white rounded-lg font-semibold py-2.5 px-4 text-sm transition-all duration-200 shadow-lg shadow-red-500/20 active:translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-red-500/40;
   }
 
   .ops-btn-secondary {
-    @apply w-full bg-dark-surface hover:bg-dark-hoverBg border border-dark-border text-theme-text rounded font-medium py-2.5 px-4 text-sm transition-colors duration-200 active:translate-y-[1px];
+    @apply w-full bg-theme-panel-alt hover:bg-theme-panel border border-dark-border text-theme-text rounded-lg font-semibold py-2.5 px-4 text-sm transition-all duration-200 active:translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-dark-border;
   }
 
-  /* Status Badges */
+  /* Status Badges - updated for premium rounded pill styling from image references */
   .ops-badge-success {
-    @apply bg-green-950/40 text-green-400 border border-green-800/40 text-xs px-2 py-0.5 rounded font-mono;
+    @apply bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 text-xs px-2.5 py-0.5 rounded-full font-mono font-medium;
   }
 
   .ops-badge-warning {
-    @apply bg-yellow-950/40 text-yellow-400 border border-yellow-800/40 text-xs px-2 py-0.5 rounded font-mono;
+    @apply bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-xs px-2.5 py-0.5 rounded-full font-mono font-medium;
   }
 
   .ops-badge-danger {
-    @apply bg-red-950/40 text-red-400 border border-red-800/40 text-xs px-2 py-0.5 rounded font-mono;
+    @apply bg-red-500/10 text-brand border border-red-500/20 text-xs px-2.5 py-0.5 rounded-full font-mono font-medium;
   }
 
   .ops-badge-info {
-    @apply bg-blue-950/40 text-blue-400 border border-blue-800/40 text-xs px-2 py-0.5 rounded font-mono;
+    @apply bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs px-2.5 py-0.5 rounded-full font-mono font-medium;
   }
 }
 
@@ -150,4 +150,43 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-hover-bg);
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: rgba(20, 21, 25, 0.7) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html:not(.dark) .glass-panel {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Micro-animations */
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hover-glow {
+  transition: all 0.2s ease-in-out;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+  transform: translateY(-2px);
 }

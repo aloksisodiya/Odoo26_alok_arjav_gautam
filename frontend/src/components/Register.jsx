@@ -70,9 +70,7 @@ const Register = () => {
       <div className="md:w-5/12 bg-theme-panel border-r border-dark-border p-8 md:p-16 flex flex-col justify-between text-gray-300">
         <div>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand flex items-center justify-center rounded shadow-lg shadow-brand/30">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
+            <img src="/logo.png" alt="TransitOps Logo" className="w-10 h-10 object-contain rounded" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white font-mono">
                 TransitOps

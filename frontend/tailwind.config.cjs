@@ -27,6 +27,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
+          "Outfit",
           "Inter",
           "system-ui",
           "-apple-system",
