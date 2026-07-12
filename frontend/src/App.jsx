@@ -5,6 +5,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "./store/authStore";
 import { useThemeStore } from "./store/themeStore";
 import Login from "./components/Login";
@@ -72,6 +73,8 @@ const AuthRedirect = ({ children }) => {
   return children;
 };
 
+const queryClient = new QueryClient();
+
 function App() {
   const { checkAuth } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
@@ -90,143 +93,145 @@ function App() {
   }, [theme]);
 
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route
-          path="/login"
-          element={
-            <AuthRedirect>
-              <Login />
-            </AuthRedirect>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <AuthRedirect>
-              <Register />
-            </AuthRedirect>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <AuthRedirect>
-              <ForgotPassword />
-            </AuthRedirect>
-          }
-        />
-        <Route
-          path="/reset-password/:token"
-          element={
-            <AuthRedirect>
-              <ResetPassword />
-            </AuthRedirect>
-          }
-        />
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route
+            path="/login"
+            element={
+              <AuthRedirect>
+                <Login />
+              </AuthRedirect>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <AuthRedirect>
+                <Register />
+              </AuthRedirect>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <AuthRedirect>
+                <ForgotPassword />
+              </AuthRedirect>
+            }
+          />
+          <Route
+            path="/reset-password/:token"
+            element={
+              <AuthRedirect>
+                <ResetPassword />
+              </AuthRedirect>
+            }
+          />
 
-        {/* Protected Operational Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["Dispatcher"]}>
-              <DashboardLayout>
-                <DispatcherDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/trips"
-          element={
-            <ProtectedRoute allowedRoles={["Dispatcher"]}>
-              <DashboardLayout>
-                <TripsManager />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected Operational Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+                <DashboardLayout>
+                  <DispatcherDashboard />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trips"
+            element={
+              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+                <DashboardLayout>
+                  <TripsManager />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/fleet"
-          element={
-            <ProtectedRoute allowedRoles={["FleetManager"]}>
-              <DashboardLayout>
-                <FleetRegistry />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/maintenance"
-          element={
-            <ProtectedRoute allowedRoles={["FleetManager"]}>
-              <DashboardLayout>
-                <MaintenanceLogs />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/fleet"
+            element={
+              <ProtectedRoute allowedRoles={["FleetManager"]}>
+                <DashboardLayout>
+                  <FleetRegistry />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/maintenance"
+            element={
+              <ProtectedRoute allowedRoles={["FleetManager"]}>
+                <DashboardLayout>
+                  <MaintenanceLogs />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/drivers"
-          element={
-            <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
-              <DashboardLayout>
-                <DriverRegistry />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/compliance"
-          element={
-            <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
-              <DashboardLayout>
-                <ComplianceLogs />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/drivers"
+            element={
+              <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
+                <DashboardLayout>
+                  <DriverRegistry />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/compliance"
+            element={
+              <ProtectedRoute allowedRoles={["SafetyOfficer"]}>
+                <DashboardLayout>
+                  <ComplianceLogs />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/expenses"
-          element={
-            <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
-              <DashboardLayout>
-                <FuelExpenses />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
-              <DashboardLayout>
-                <AnalyticsDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/expenses"
+            element={
+              <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
+                <DashboardLayout>
+                  <FuelExpenses />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute allowedRoles={["FinancialAnalyst"]}>
+                <DashboardLayout>
+                  <AnalyticsDashboard />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Settings accessible by all roles, but layout handles navigation */}
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <SystemSettings />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+          {/* Settings accessible by all roles, but layout handles navigation */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <SystemSettings />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Catch-all Routing */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+          {/* Catch-all Routing */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

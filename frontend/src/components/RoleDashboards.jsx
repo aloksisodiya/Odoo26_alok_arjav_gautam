@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import {
   Truck,
   Users,
@@ -9,6 +11,10 @@ import {
   BarChart3,
   ShieldAlert,
   Sliders,
+  Search,
+  CheckCircle,
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 
 const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
@@ -32,98 +38,353 @@ const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
 
 // 1. Dispatcher default: Dashboard
 export const DispatcherDashboard = () => {
+  const [search, setSearch] = useState("");
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sourceFilter, setSourceFilter] = useState("All");
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["dashboardStats"],
+    queryFn: async () => {
+      const token = useAuthStore.getState().token;
+      const response = await axios.get("http://localhost:5000/api/dashboard/stats", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data.data;
+    },
+    refetchInterval: 10000 // Keep operational stats live
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-theme-muted font-mono">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mb-4"></div>
+        <span>CONNECTING DEPOT FEED...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-950/40 border border-red-500/30 p-6 rounded text-center text-red-400 font-mono">
+        <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-red-500" />
+        <h4 className="font-bold">FEED ERROR</h4>
+        <p className="text-xs mt-1">Failed to establish active websocket/data connection to database.</p>
+      </div>
+    );
+  }
+
+  const { metrics, vehicleStatus, recentTrips } = data;
+
+  // Filter logic
+  const filteredTrips = recentTrips.filter(trip => {
+    const matchesSearch = 
+      trip.tripId.toLowerCase().includes(search.toLowerCase()) ||
+      trip.source.toLowerCase().includes(search.toLowerCase()) ||
+      trip.destination.toLowerCase().includes(search.toLowerCase()) ||
+      trip.driver.toLowerCase().includes(search.toLowerCase()) ||
+      trip.vehicle.toLowerCase().includes(search.toLowerCase());
+
+    const matchesType = vehicleTypeFilter === "All" || trip.vehicleType === vehicleTypeFilter;
+    const matchesStatus = statusFilter === "All" || trip.status === statusFilter;
+    const matchesSource = sourceFilter === "All" || trip.source === sourceFilter;
+
+    return matchesSearch && matchesType && matchesStatus && matchesSource;
+  });
+
+  // Calculate percentages for vehicle status progress bars
+  const totalVehicles = (vehicleStatus.available || 0) + (vehicleStatus.onTrip || 0) + (vehicleStatus.inShop || 0) + (vehicleStatus.retired || 0);
+  const getPct = (val) => totalVehicles > 0 ? Math.round((val / totalVehicles) * 100) : 0;
+
+  // Unique sources for the dropdown filter
+  const uniqueSources = [...new Set(recentTrips.map(t => t.source))];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white font-mono">
-          DISPATCH OPERATIONS CENTRE
-        </h2>
-        <p className="text-xs text-gray-400 mt-1">
-          Real-time status overview of active trips, drivers, and vehicles.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <Card
-          title="Active Trips"
-          value="8 / 12"
-          desc="4 trips in queue"
-          icon={Compass}
-        />
-        <Card
-          title="Vehicles Available"
-          value="18 / 22"
-          desc="4 in maintenance shop"
-          icon={Truck}
-          color="text-green-400"
-        />
-        <Card
-          title="Drivers Active"
-          value="14 / 20"
-          desc="6 off-duty, 0 suspended"
-          icon={Users}
-          color="text-blue-400"
-        />
-        <Card
-          title="Warning Alerts"
-          value="0"
-          desc="All license & compliance valid"
-          icon={ShieldAlert}
-          color="text-red-400"
-        />
-      </div>
-
-      <div className="bg-dark-surface border border-dark-border rounded p-6">
-        <h3 className="text-sm font-bold text-white font-mono uppercase tracking-wider mb-4">
-          Active Dispatches
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono text-gray-300">
-            <thead>
-              <tr className="border-b border-dark-border pb-3 text-gray-500 text-[10px] uppercase">
-                <th className="py-2">Trip ID</th>
-                <th>Route</th>
-                <th>Vehicle</th>
-                <th>Driver</th>
-                <th>Cargo</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-dark-border/40">
-              <tr className="hover:bg-dark-surface/20">
-                <td className="py-3 text-brand">TRIP-204</td>
-                <td>Depot A ➔ Sector 4 Distribution</td>
-                <td>TRK-882 (Volvo)</td>
-                <td>Gautam Kumar</td>
-                <td className="technical-mono">8,500 kg</td>
-                <td>
-                  <span className="ops-badge-warning">Dispatched</span>
-                </td>
-              </tr>
-              <tr className="hover:bg-dark-surface/20">
-                <td className="py-3 text-brand">TRIP-205</td>
-                <td>Depot A ➔ North Terminal</td>
-                <td>VAN-103 (Transit)</td>
-                <td>Alok Kumar</td>
-                <td className="technical-mono">1,200 kg</td>
-                <td>
-                  <span className="ops-badge-warning">Dispatched</span>
-                </td>
-              </tr>
-              <tr className="hover:bg-dark-surface/20">
-                <td className="py-3 text-brand">TRIP-206</td>
-                <td>West Warehouse ➔ South Depot</td>
-                <td>TRK-901 (Scania)</td>
-                <td>S. Shinde</td>
-                <td className="technical-mono">12,000 kg</td>
-                <td>
-                  <span className="ops-badge-success">Completed</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+    <div className="space-y-6 text-theme-text transition-colors duration-200">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold font-mono tracking-tight text-theme-text uppercase">
+            Dispatch Operations Centre
+          </h2>
+          <p className="text-xs text-theme-muted mt-1 font-mono">
+            Real-time database feed of active dispatches, driver rosters, and fleet metrics.
+          </p>
+        </div>
+        
+        {/* Search bar */}
+        <div className="relative w-full md:w-64">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-theme-muted">
+            <Search className="w-4 h-4" />
+          </span>
+          <input
+            type="text"
+            placeholder="Search dispatches..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="ops-input pl-9"
+          />
         </div>
       </div>
+
+      {/* METRIC GRID (7 Cards Side by Side) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-blue-500">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Active Vehicles</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.activeVehicles).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">In transit en route</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-green-500">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Available</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.availableVehicles).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">In depot ready</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-amber-500">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">In Shop</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.vehiclesInMaintenance).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Maintenance status</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-indigo-500">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Active Trips</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.activeTrips).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Dispatched trips</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-sky-400">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Pending Trips</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.pendingTrips).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Draft queues</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-gray-500">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Drivers Duty</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{String(metrics.driversOnDuty).padStart(2, '0')}</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">On-road drivers</span>
+        </div>
+
+        <div className="bg-theme-panel border border-dark-border p-4 rounded shadow flex flex-col justify-between border-l-2 border-l-brand">
+          <div>
+            <span className="text-[9px] text-theme-muted font-mono font-bold uppercase tracking-wider block">Utilization</span>
+            <span className="text-2xl font-bold font-mono text-theme-text mt-1 block">{metrics.fleetUtilization}%</span>
+          </div>
+          <span className="text-[9px] text-theme-muted font-mono mt-2 block leading-none">Operational ratio</span>
+        </div>
+      </div>
+
+      {/* FILTERS */}
+      <div className="bg-theme-panel border border-dark-border p-4 rounded shadow space-y-3">
+        <span className="text-[10px] text-theme-muted font-mono font-bold uppercase tracking-widest block">Operations Filters</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-[10px] text-theme-muted font-mono uppercase mb-1 font-bold">Vehicle Type</label>
+            <select 
+              value={vehicleTypeFilter} 
+              onChange={(e) => setVehicleTypeFilter(e.target.value)} 
+              className="ops-input cursor-pointer"
+            >
+              <option value="All">All Types</option>
+              <option value="Van">Van</option>
+              <option value="Truck">Truck</option>
+              <option value="Mini">Mini</option>
+              <option value="Container">Container</option>
+              <option value="Flatbed">Flatbed</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-[10px] text-theme-muted font-mono uppercase mb-1 font-bold">Trip Status</label>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className="ops-input cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Dispatched">Dispatched</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-theme-muted font-mono uppercase mb-1 font-bold">Source Region</label>
+            <select 
+              value={sourceFilter} 
+              onChange={(e) => setSourceFilter(e.target.value)} 
+              className="ops-input cursor-pointer"
+            >
+              <option value="All">All Regions</option>
+              {uniqueSources.map((source, idx) => (
+                <option key={idx} value={source}>{source}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN DATA SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* RECENT TRIPS TABLE (2/3 width) */}
+        <div className="lg:col-span-2 bg-theme-panel border border-dark-border rounded p-6 shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-wider text-theme-text flex items-center gap-2">
+              <FileText className="w-4 h-4 text-brand" /> Recent Trips Log
+            </h3>
+            <span className="text-[10px] text-theme-muted font-mono">Showing {filteredTrips.length} dispatches</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            {filteredTrips.length > 0 ? (
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-dark-border pb-3 text-theme-muted text-[10px] uppercase">
+                    <th className="py-2.5">Trip ID</th>
+                    <th>Vehicle</th>
+                    <th>Driver</th>
+                    <th>Route Map</th>
+                    <th>Status</th>
+                    <th className="text-right">ETA / Progress</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-border/40 text-theme-text">
+                  {filteredTrips.map((trip) => (
+                    <tr key={trip.id} className="hover:bg-dark-hoverBg/25 transition-colors">
+                      <td className="py-3 text-brand font-bold">{trip.tripId}</td>
+                      <td>
+                        <span className="font-semibold block">{trip.vehicle}</span>
+                        <span className="text-[10px] text-theme-muted font-sans block">{trip.vehicleName}</span>
+                      </td>
+                      <td className="font-semibold">{trip.driver}</td>
+                      <td>
+                        <span className="block text-[11px] font-sans truncate max-w-[200px]" title={`${trip.source} ➔ ${trip.destination}`}>
+                          {trip.source} ➔ {trip.destination}
+                        </span>
+                      </td>
+                      <td>
+                        {trip.status === "Completed" && <span className="ops-badge-success">Completed</span>}
+                        {trip.status === "Dispatched" && <span className="ops-badge-warning">Dispatched</span>}
+                        {trip.status === "Draft" && <span className="ops-badge-info bg-gray-500/10 text-gray-400 border-gray-500/20">Draft</span>}
+                        {trip.status === "Cancelled" && <span className="ops-badge-danger">Cancelled</span>}
+                      </td>
+                      <td className="text-right technical-mono text-theme-muted font-bold">
+                        {trip.status === "Dispatched" ? (
+                          <span className="text-blue-400 font-mono">{trip.eta}</span>
+                        ) : trip.status === "Draft" ? (
+                          <span className="text-gray-500 font-mono">Awaiting vehicle</span>
+                        ) : (
+                          <span className="text-theme-muted font-mono">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="py-12 text-center text-theme-muted font-mono text-xs">
+                NO DISPATCHES MATCHING SELECTED FILTERS.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* VEHICLE STATUS PROGRESS BARS (1/3 width) */}
+        <div className="bg-theme-panel border border-dark-border rounded p-6 shadow space-y-6">
+          <h3 className="text-sm font-bold font-mono uppercase tracking-wider text-theme-text flex items-center gap-2">
+            <Truck className="w-4 h-4 text-brand" /> Vehicle Status Distribution
+          </h3>
+
+          <div className="space-y-4">
+            {/* Available */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Available
+                </span>
+                <span className="font-bold">{vehicleStatus.available} vehicles ({getPct(vehicleStatus.available)}%)</span>
+              </div>
+              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
+                <div 
+                  className="bg-green-500 h-full transition-all duration-500" 
+                  style={{ width: `${getPct(vehicleStatus.available)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* On Trip */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> On Trip
+                </span>
+                <span className="font-bold">{vehicleStatus.onTrip} vehicles ({getPct(vehicleStatus.onTrip)}%)</span>
+              </div>
+              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-full transition-all duration-500" 
+                  style={{ width: `${getPct(vehicleStatus.onTrip)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* In Shop */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Shop
+                </span>
+                <span className="font-bold">{vehicleStatus.inShop} vehicles ({getPct(vehicleStatus.inShop)}%)</span>
+              </div>
+              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
+                <div 
+                  className="bg-amber-500 h-full transition-all duration-500" 
+                  style={{ width: `${getPct(vehicleStatus.inShop)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Retired */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono text-theme-text">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Retired
+                </span>
+                <span className="font-bold">{vehicleStatus.retired} vehicles ({getPct(vehicleStatus.retired)}%)</span>
+              </div>
+              <div className="w-full bg-dark-bg border border-dark-border h-2.5 rounded overflow-hidden">
+                <div 
+                  className="bg-red-500 h-full transition-all duration-500" 
+                  style={{ width: `${getPct(vehicleStatus.retired)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dark-border/40 pt-4 text-center">
+            <span className="text-[10px] text-theme-muted font-mono">
+              TOTAL OPERATIONAL FLEET: {totalVehicles - (vehicleStatus.retired || 0)} UNITS
+            </span>
+          </div>
+        </div>
+
+      </div>
+
     </div>
   );
 };
