@@ -3762,15 +3762,15 @@ export const AnalyticsDashboard = () => {
               >
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.45}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.45}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" strokeOpacity={0.3} />
                 <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickLine={false} />
                 <YAxis stroke="#71717a" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={{ backgroundColor: "#141519", borderColor: "#23252a", fontSize: "10px", borderRadius: "8px" }} />
-                <Area type="monotone" dataKey="Revenue" stroke="#ef4444" strokeWidth={3.5} fillOpacity={1} fill="url(#colorRevenue)" />
+                <Area type="monotone" dataKey="Revenue" stroke="#10b981" strokeWidth={3.5} fillOpacity={1} fill="url(#colorRevenue)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
