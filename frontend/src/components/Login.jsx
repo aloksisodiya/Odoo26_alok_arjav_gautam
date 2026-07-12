@@ -93,7 +93,7 @@ const Login = () => {
       </div>
 
       {/* LEFT SIDE: Branding Panel (Greyish operational panel) */}
-      <div className="md:w-5/12 bg-theme-panel border-r border-dark-border p-8 md:p-16 flex flex-col justify-between text-gray-300">
+      <div className="md:w-5/12 bg-theme-panel border-r border-dark-border p-6 md:pt-6 md:px-12 md:pb-8 flex flex-col justify-start text-gray-300">
         <div>
           {/* Logo Brand */}
           <div className="flex items-center gap-3 mb-6">
