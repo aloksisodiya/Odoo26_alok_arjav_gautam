@@ -9,6 +9,7 @@ const driverRoutes = require('./routes/drivers');
 const tripRoutes = require('./routes/trips');
 const maintenanceRoutes = require('./routes/maintenance');
 const expenseRoutes = require('./routes/expenses');
+const alertRoutes = require('./routes/alerts');
 
 // Connect to Database
 connectDB();
@@ -30,6 +31,7 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/alerts', alertRoutes);
 
 // Simple Health Check Endpoint
 app.get('/api/health', (req, res) => {

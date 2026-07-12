@@ -1,7 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { jsPDF } from "jspdf";
 import {
   Truck,
   Users,
@@ -17,7 +20,9 @@ import {
   AlertTriangle,
   Plus,
   Calendar,
-  FileCheck
+  FileCheck,
+  Download,
+  Play
 } from "lucide-react";
 
 const Card = ({ title, value, desc, icon: Icon, color = "text-brand" }) => (
@@ -404,8 +409,26 @@ export const TripsManager = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  const mapRef = React.useRef(null);
+  const mapInstanceRef = React.useRef(null);
+  const pathLayerRef = React.useRef(null);
+  const markersRef = React.useRef([]);
+  const vehicleMarkerRef = React.useRef(null);
 
   const token = useAuthStore((state) => state.token);
+
+  // Depot mapping coords
+  const coordsMap = {
+    "Depot Alpha": [23.2156, 72.6369],
+    "Sector 4 Distribution": [23.2200, 72.6500],
+    "West Warehouse": [23.0300, 72.5000],
+    "North Terminal": [23.3000, 72.6000],
+    "South Depot": [22.9000, 72.6000],
+    "Gandhinagar Depot": [23.2156, 72.6369],
+    "Ahmedabad Hub": [23.0225, 72.5714],
+  };
 
   // Queries
   const { data: trips, refetch: refetchTrips } = useQuery({
@@ -437,6 +460,219 @@ export const TripsManager = () => {
       return response.data.data;
     }
   });
+
+  // Map effect
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Prevent double-initialization crash
+    if (mapRef.current._leaflet_id) {
+      return;
+    }
+
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapRef.current).setView([23.1000, 72.6000], 10);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      mapInstanceRef.current = map;
+      
+      // Fix tile misalignment on render
+      map.invalidateSize();
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 250);
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update map markers when selectedTrip changes
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    // Clear existing
+    if (pathLayerRef.current) {
+      mapInstanceRef.current.removeLayer(pathLayerRef.current);
+      pathLayerRef.current = null;
+    }
+    markersRef.current.forEach(m => mapInstanceRef.current.removeLayer(m));
+    markersRef.current = [];
+    if (vehicleMarkerRef.current) {
+      mapInstanceRef.current.removeLayer(vehicleMarkerRef.current);
+      vehicleMarkerRef.current = null;
+    }
+
+    if (selectedTrip) {
+      const srcName = selectedTrip.source;
+      const destName = selectedTrip.destination;
+
+      const srcCoords = coordsMap[srcName] || coordsMap["Depot Alpha"];
+      const destCoords = coordsMap[destName] || coordsMap["Ahmedabad Hub"];
+
+      const startIcon = L.divIcon({
+        html: `<div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
+        className: "",
+        iconSize: [12, 12]
+      });
+
+      const endIcon = L.divIcon({
+        html: `<div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
+        className: "",
+        iconSize: [12, 12]
+      });
+
+      const startMarker = L.marker(srcCoords, { icon: startIcon }).addTo(mapInstanceRef.current).bindPopup(`Source: ${srcName}`);
+      const endMarker = L.marker(destCoords, { icon: endIcon }).addTo(mapInstanceRef.current).bindPopup(`Destination: ${destName}`);
+      markersRef.current = [startMarker, endMarker];
+
+      pathLayerRef.current = L.polyline([srcCoords, destCoords], {
+        color: "#3b82f6",
+        weight: 3,
+        dashArray: "5, 10"
+      }).addTo(mapInstanceRef.current);
+
+      mapInstanceRef.current.fitBounds([srcCoords, destCoords], { padding: [40, 40] });
+
+      if (selectedTrip.status === "Dispatched") {
+        const vehicleIcon = L.divIcon({
+          html: `<div style="background-color: #3b82f6; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translateY(-5px); z-index: 1000;" class="animate-bounce">🚚</div>`,
+          className: "",
+          iconSize: [22, 22]
+        });
+        vehicleMarkerRef.current = L.marker(srcCoords, { icon: vehicleIcon }).addTo(mapInstanceRef.current).bindPopup("Truck Tracking Active");
+      }
+    }
+  }, [selectedTrip]);
+
+  // GPS Runner animation
+  const handleSimulateGPS = () => {
+    if (!selectedTrip || selectedTrip.status !== "Dispatched" || isSimulating) return;
+
+    const srcName = selectedTrip.source;
+    const destName = selectedTrip.destination;
+    const srcCoords = coordsMap[srcName] || coordsMap["Depot Alpha"];
+    const destCoords = coordsMap[destName] || coordsMap["Ahmedabad Hub"];
+
+    setIsSimulating(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    let step = 0;
+    const totalSteps = 40; // 4 seconds
+
+    const interval = setInterval(async () => {
+      step++;
+      const ratio = step / totalSteps;
+      const lat = srcCoords[0] + (destCoords[0] - srcCoords[0]) * ratio;
+      const lng = srcCoords[1] + (destCoords[1] - srcCoords[1]) * ratio;
+
+      if (vehicleMarkerRef.current && mapInstanceRef.current) {
+        vehicleMarkerRef.current.setLatLng([lat, lng]);
+        mapInstanceRef.current.panTo([lat, lng]);
+      }
+
+      if (step >= totalSteps) {
+        clearInterval(interval);
+        setIsSimulating(false);
+        setSuccessMsg(`Simulated geofence breached! Vehicle entered destination boundary. Trip completed.`);
+        await handleUpdateStatus(selectedTrip._id, "Completed");
+      }
+    }, 100);
+  };
+
+  // jsPDF Invoice
+  const handleDownloadInvoice = (trip) => {
+    const doc = new jsPDF();
+    const cost = (trip.plannedDistanceKm * 10) + (trip.cargoWeightKg * 0.5);
+
+    // Styling
+    doc.setFillColor(24, 24, 27); // Dark zinc header
+    doc.rect(0, 0, 210, 40, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("TRANSITOPS BILLING INVOICE", 15, 25);
+
+    doc.setTextColor(82, 82, 91);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    
+    doc.text(`Invoice Ref: INV-${trip.tripId}-${Math.floor(Math.random() * 10000)}`, 15, 55);
+    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`, 15, 62);
+    
+    // Details
+    doc.setFont("helvetica", "bold");
+    doc.text("SHIPMENT DETAIL MATRIX", 15, 80);
+    doc.line(15, 82, 195, 82);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Source Depot: ${trip.source}`, 15, 92);
+    doc.text(`Destination Depot: ${trip.destination}`, 15, 99);
+    doc.text(`Vehicle Asset: ${trip.vehicleId ? trip.vehicleId.registrationNo : "N/A"}`, 15, 106);
+    doc.text(`Assigned Driver: ${trip.driverId ? trip.driverId.name : "N/A"}`, 15, 113);
+    doc.text(`Cargo Volume: ${trip.cargoWeightKg} kg`, 15, 120);
+    doc.text(`Odometer Run: ${trip.plannedDistanceKm} km`, 15, 127);
+    
+    // Charges Table
+    doc.setFont("helvetica", "bold");
+    doc.text("BILLING MATRIX BREAKDOWN", 15, 145);
+    doc.line(15, 147, 195, 147);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text("Distance Freight charge (INR 10/km):", 15, 157);
+    doc.text(`INR ${(trip.plannedDistanceKm * 10).toLocaleString()}`, 150, 157);
+    
+    doc.text("Cargo Weight freight surcharge (INR 0.50/kg):", 15, 164);
+    doc.text(`INR ${(trip.cargoWeightKg * 0.5).toLocaleString()}`, 150, 164);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("NET PAYABLE DUE:", 15, 178);
+    doc.text(`INR ${cost.toLocaleString()}`, 150, 178);
+    
+    doc.line(15, 182, 195, 182);
+    
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text("TransitOps automated billing registry matrix. Paid invoice copy.", 15, 200);
+
+    // Save PDF
+    doc.save(`Invoice_${trip.tripId}.pdf`);
+  };
+
+  // Export CSV
+  const handleExportTripsCSV = () => {
+    const headers = ["Trip ID", "Source", "Destination", "Vehicle Reg", "Driver Name", "Cargo Weight (kg)", "Planned Distance (km)", "Status"];
+    const rows = (trips || []).map(t => [
+      t.tripId,
+      t.source,
+      t.destination,
+      t.vehicleId ? t.vehicleId.registrationNo : "—",
+      t.driverId ? t.driverId.name : "—",
+      t.cargoWeightKg,
+      t.plannedDistanceKm,
+      t.status
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Trips_Ledger_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filter available items
   const availableVehicles = (vehicles || []).filter(v => v.status === "Available");
@@ -470,7 +706,6 @@ export const TripsManager = () => {
       });
 
       setSuccessMsg(status === "Dispatched" ? "Trip dispatched successfully!" : "Draft trip saved!");
-      // Reset form
       setSource("");
       setDestination("");
       setVehicleId("");
@@ -685,95 +920,145 @@ export const TripsManager = () => {
           </form>
         </div>
 
-        {/* LIVE BOARD (col-span-7) */}
-        <div className="lg:col-span-7 bg-theme-panel border border-dark-border p-6 rounded shadow space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="text-sm font-bold font-mono uppercase tracking-wider text-theme-text">Live Board</h3>
-            <div className="relative w-full sm:w-56">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-theme-muted">
-                <Search className="w-3.5 h-3.5" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search board..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="ops-input pl-9 text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-            {filteredTrips.length > 0 ? (
-              filteredTrips.map(trip => (
-                <div 
-                  key={trip._id}
-                  onClick={() => setSelectedTrip(trip)}
-                  className={`p-4 rounded border font-mono text-xs transition-all cursor-pointer ${selectedTrip?._id === trip._id ? "border-brand bg-brand/5 shadow" : "border-dark-border bg-dark-bg hover:border-dark-border/80"}`}
-                >
-                  <div className="flex items-center justify-between border-b border-dark-border/40 pb-2 mb-2">
-                    <div>
-                      <span className="text-brand font-bold text-sm block">{trip.tripId}</span>
-                      <span className="text-[10px] text-theme-muted font-sans mt-0.5 block">
-                        {trip.vehicleId ? `${trip.vehicleId.registrationNo} / ${trip.vehicleId.name}` : "Unassigned Vehicle"}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      {trip.status === "Completed" && <span className="ops-badge-success">Completed</span>}
-                      {trip.status === "Dispatched" && <span className="ops-badge-warning">Dispatched</span>}
-                      {trip.status === "Draft" && <span className="ops-badge-info bg-gray-500/10 text-gray-400 border-gray-500/20">Draft</span>}
-                      {trip.status === "Cancelled" && <span className="ops-badge-danger">Cancelled</span>}
-                      <span className="text-[10px] text-theme-muted block mt-1">
-                        {trip.driverId ? trip.driverId.name : "Unassigned Driver"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-theme-muted pt-1">
-                    <div>
-                      <span className="block text-theme-text font-semibold">{trip.source} ➔ {trip.destination}</span>
-                      <span className="block mt-0.5">Cargo: {trip.cargoWeightKg} kg • Distance: {trip.plannedDistanceKm} km</span>
-                    </div>
-                    
-                    {/* Action controllers */}
-                    <div className="flex items-center gap-2">
-                      {trip.status === "Dispatched" && (
-                        <>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Completed"); }}
-                            className="bg-green-600 hover:bg-green-500 text-white font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
-                          >
-                            Complete
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Cancelled"); }}
-                            className="bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-400 font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                      {trip.status === "Draft" && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Dispatched"); }}
-                          className="bg-brand hover:bg-brand-light text-black font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
-                        >
-                          Dispatch Now
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-12 text-center text-theme-muted font-mono text-xs">
-                NO TRIPS CURRENTLY LOGGED ON THE LIVE BOARD.
+        {/* MAP & LIVE BOARD (col-span-7) */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* LEAFLET MAP PANEL */}
+          <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Live Route Tracker</h3>
+                {selectedTrip && (
+                  <p className="text-[10px] text-theme-muted font-mono mt-0.5">
+                    Selected Route: {selectedTrip.source} ➔ {selectedTrip.destination} ({selectedTrip.status})
+                  </p>
+                )}
               </div>
-            )}
+              {selectedTrip && selectedTrip.status === "Dispatched" && (
+                <button
+                  onClick={handleSimulateGPS}
+                  disabled={isSimulating}
+                  className={`bg-brand text-black text-[10px] font-bold uppercase px-3 py-1.5 rounded hover:bg-brand-light transition-all flex items-center gap-1 ${isSimulating ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <Play className="w-3.5 h-3.5" /> {isSimulating ? "Simulating GPS..." : "Simulate GPS"}
+                </button>
+              )}
+            </div>
+            
+            {/* Map Canvas */}
+            <div 
+              ref={mapRef} 
+              className="h-64 w-full bg-dark-bg border border-dark-border rounded overflow-hidden z-10"
+              style={{ minHeight: "260px" }}
+            ></div>
           </div>
 
-          <div className="border-t border-dark-border/40 pt-4 text-center font-mono text-[9px] text-theme-muted uppercase tracking-wider">
-            On Complete: odometer ➔ fuel log ➔ expenses ➔ Vehicle & Driver Available
+          {/* LIVE BOARD */}
+          <div className="bg-theme-panel border border-dark-border p-6 rounded shadow space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-bold font-mono uppercase tracking-wider text-theme-text">Live Board</h3>
+                <button
+                  onClick={handleExportTripsCSV}
+                  className="bg-dark-surface border border-dark-border text-white text-[10px] uppercase px-2.5 py-1 rounded hover:bg-dark-hoverBg transition-colors flex items-center gap-1 font-bold"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export CSV
+                </button>
+              </div>
+              <div className="relative w-full sm:w-56">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-theme-muted">
+                  <Search className="w-3.5 h-3.5" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search board..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ops-input pl-9 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+              {filteredTrips.length > 0 ? (
+                filteredTrips.map(trip => (
+                  <div 
+                    key={trip._id}
+                    onClick={() => setSelectedTrip(trip)}
+                    className={`p-4 rounded border font-mono text-xs transition-all cursor-pointer ${selectedTrip?._id === trip._id ? "border-brand bg-brand/5 shadow" : "border-dark-border bg-dark-bg hover:border-dark-border/80"}`}
+                  >
+                    <div className="flex items-center justify-between border-b border-dark-border/40 pb-2 mb-2">
+                      <div>
+                        <span className="text-brand font-bold text-sm block">{trip.tripId}</span>
+                        <span className="text-[10px] text-theme-muted font-sans mt-0.5 block">
+                          {trip.vehicleId ? `${trip.vehicleId.registrationNo} / ${trip.vehicleId.name}` : "Unassigned Vehicle"}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {trip.status === "Completed" && <span className="ops-badge-success">Completed</span>}
+                        {trip.status === "Dispatched" && <span className="ops-badge-warning">Dispatched</span>}
+                        {trip.status === "Draft" && <span className="ops-badge-info bg-gray-500/10 text-gray-400 border-gray-500/20">Draft</span>}
+                        {trip.status === "Cancelled" && <span className="ops-badge-danger">Cancelled</span>}
+                        <span className="text-[10px] text-theme-muted block mt-1">
+                          {trip.driverId ? trip.driverId.name : "Unassigned Driver"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-theme-muted pt-1">
+                      <div>
+                        <span className="block text-theme-text font-semibold">{trip.source} ➔ {trip.destination}</span>
+                        <span className="block mt-0.5">Cargo: {trip.cargoWeightKg} kg • Distance: {trip.plannedDistanceKm} km</span>
+                      </div>
+                      
+                      {/* Action controllers */}
+                      <div className="flex items-center gap-2">
+                        {trip.status === "Completed" && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDownloadInvoice(trip); }}
+                            className="bg-brand hover:bg-brand-light text-black font-bold px-2.5 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors flex items-center gap-0.5"
+                          >
+                            <FileText className="w-3 h-3" /> Invoice
+                          </button>
+                        )}
+                        {trip.status === "Dispatched" && (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Completed"); }}
+                              className="bg-green-600 hover:bg-green-500 text-white font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
+                            >
+                              Complete
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Cancelled"); }}
+                              className="bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-400 font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                        {trip.status === "Draft" && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(trip._id, "Dispatched"); }}
+                            className="bg-brand hover:bg-brand-light text-black font-bold px-2 py-1 rounded text-[9px] uppercase font-mono tracking-wide transition-colors"
+                          >
+                            Dispatch Now
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 text-center text-theme-muted font-mono text-xs">
+                  NO TRIPS CURRENTLY LOGGED ON THE LIVE BOARD.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-dark-border/40 pt-4 text-center font-mono text-[9px] text-theme-muted uppercase tracking-wider">
+              On Complete: odometer ➔ fuel log ➔ expenses ➔ Vehicle & Driver Available
+            </div>
           </div>
         </div>
 
@@ -803,7 +1088,7 @@ export const FleetRegistry = () => {
 
   const token = useAuthStore((state) => state.token);
 
-  const { data: vehicles, isLoading, refetch } = useQuery({
+  const { data: vehicles, isLoading: vehiclesLoading, refetch } = useQuery({
     queryKey: ["fleetVehicles"],
     queryFn: async () => {
       const response = await axios.get("http://localhost:5000/api/vehicles", {
@@ -812,6 +1097,52 @@ export const FleetRegistry = () => {
       return response.data.data;
     }
   });
+
+  const { data: maintenance, isLoading: maintLoading } = useQuery({
+    queryKey: ["fleetMaintenance"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/maintenance", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data.data;
+    }
+  });
+
+  const isLoading = vehiclesLoading || maintLoading;
+
+  // Aggregate repair logs
+  const maintenanceCosts = {};
+  (maintenance || []).forEach(log => {
+    const vId = log.vehicleId?._id || log.vehicleId;
+    if (vId) {
+      maintenanceCosts[vId] = (maintenanceCosts[vId] || 0) + (log.cost || 0);
+    }
+  });
+
+  const handleExportCSV = () => {
+    const headers = ["Registration No", "Name/Model", "Type", "Capacity (kg)", "Odometer (km)", "Acquisition Cost (₹)", "Status", "Cumulative Repairs (₹)"];
+    const rows = (vehicles || []).map(v => [
+      v.registrationNo,
+      v.name,
+      v.type,
+      v.capacityKg,
+      v.odometerKm,
+      v.acquisitionCost,
+      v.status,
+      maintenanceCosts[v._id] || 0
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Fleet_Assets_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -831,7 +1162,6 @@ export const FleetRegistry = () => {
       });
       setSuccessMsg("Vehicle registered successfully!");
       setIsModalOpen(false);
-      // Reset Form
       setRegNo("");
       setName("");
       setType("Truck");
@@ -876,12 +1206,20 @@ export const FleetRegistry = () => {
           <h2 className="text-xl font-bold font-mono uppercase tracking-tight">Vehicle Registry</h2>
           <p className="text-xs text-theme-muted mt-1 font-mono">Manage and track company transportation assets.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" /> Add Vehicle
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="bg-dark-surface border border-dark-border text-white font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-dark-hoverBg flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" /> Add Vehicle
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -1107,22 +1445,34 @@ export const FleetRegistry = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border/40 text-theme-text">
-                {filtered.map(v => (
-                  <tr key={v._id} className="hover:bg-dark-hoverBg/25 transition-colors">
-                    <td className="py-3 text-white font-bold">{v.registrationNo}</td>
-                    <td className="font-semibold">{v.name}</td>
-                    <td>{v.type}</td>
-                    <td>{v.capacityKg} kg</td>
-                    <td className="technical-mono">{Number(v.odometerKm).toLocaleString()} km</td>
-                    <td className="technical-mono">₹{Number(v.acquisitionCost).toLocaleString()}</td>
-                    <td className="text-right">
-                      {v.status === "Available" && <span className="ops-badge-success">Available</span>}
-                      {v.status === "OnTrip" && <span className="ops-badge-warning bg-blue-500/10 text-blue-400 border-blue-500/20">On Trip</span>}
-                      {v.status === "InShop" && <span className="ops-badge-warning">In Shop</span>}
-                      {v.status === "Retired" && <span className="ops-badge-danger">Retired</span>}
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(v => {
+                  const repairsCost = maintenanceCosts[v._id] || 0;
+                  const isHighDepreciation = repairsCost >= (v.acquisitionCost || 0) * 0.5;
+
+                  return (
+                    <tr key={v._id} className="hover:bg-dark-hoverBg/25 transition-colors">
+                      <td className="py-3 text-white font-bold">
+                        <div>{v.registrationNo}</div>
+                        {isHighDepreciation && (
+                          <div className="text-[9px] text-red-400 font-bold mt-1 flex items-center gap-0.5 uppercase tracking-wide">
+                            ⚠️ Depr. Alert (Repairs: ₹{repairsCost.toLocaleString()} &gt; 50% cost)
+                          </div>
+                        )}
+                      </td>
+                      <td className="font-semibold">{v.name}</td>
+                      <td>{v.type}</td>
+                      <td>{v.capacityKg} kg</td>
+                      <td className="technical-mono">{Number(v.odometerKm).toLocaleString()} km</td>
+                      <td className="technical-mono">₹{Number(v.acquisitionCost).toLocaleString()}</td>
+                      <td className="text-right">
+                        {v.status === "Available" && <span className="ops-badge-success">Available</span>}
+                        {v.status === "OnTrip" && <span className="ops-badge-warning bg-blue-500/10 text-blue-400 border-blue-500/20">On Trip</span>}
+                        {v.status === "InShop" && <span className="ops-badge-warning">In Shop</span>}
+                        {v.status === "Retired" && <span className="ops-badge-danger">Retired</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : (
@@ -1859,6 +2209,50 @@ export const FuelExpenses = () => {
 
   const { fuelLogs = [], otherExpenses = [], metrics = {} } = expenseData || {};
 
+  const handleExportFuelCSV = () => {
+    const headers = ["Vehicle", "Date", "Liters", "Cost (INR)"];
+    const rows = (fuelLogs || []).map(log => [
+      log.vehicleId ? log.vehicleId.registrationNo : "—",
+      getFormattedDate(log.date),
+      `${log.liters} L`,
+      log.cost
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Fuel_Logs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExpensesCSV = () => {
+    const headers = ["Trip", "Vehicle", "Toll (INR)", "Other (INR)", "Maintenance Linked (INR)", "Total (INR)"];
+    const rows = (otherExpenses || []).map(exp => [
+      exp.tripId ? exp.tripId.tripId : "—",
+      exp.vehicleId ? exp.vehicleId.registrationNo : "—",
+      exp.toll,
+      exp.other,
+      exp.maintenanceCost,
+      exp.total
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Other_Expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 text-theme-text font-mono text-xs">
       <div>
@@ -2035,12 +2429,20 @@ export const FuelExpenses = () => {
       <div className="bg-theme-panel border border-dark-border rounded p-6 shadow space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wider">Fuel Logs</h3>
-          <button
-            onClick={() => setIsFuelModalOpen(true)}
-            className="bg-brand text-black font-bold text-[10px] uppercase px-3 py-1.5 rounded hover:bg-brand-light flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" /> Log Fuel
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportFuelCSV}
+              className="bg-dark-surface border border-dark-border text-white text-[10px] uppercase px-3 py-1.5 rounded hover:bg-dark-hoverBg flex items-center gap-1 transition-colors font-bold"
+            >
+              <Download className="w-3.5 h-3.5" /> Export CSV
+            </button>
+            <button
+              onClick={() => setIsFuelModalOpen(true)}
+              className="bg-brand text-black font-bold text-[10px] uppercase px-3 py-1.5 rounded hover:bg-brand-light flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Log Fuel
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -2077,12 +2479,20 @@ export const FuelExpenses = () => {
       <div className="bg-theme-panel border border-dark-border rounded p-6 shadow space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase text-white font-mono tracking-wider">Other Expenses (Toll / Misc)</h3>
-          <button
-            onClick={() => setIsExpenseModalOpen(true)}
-            className="bg-brand text-black font-bold text-[10px] uppercase px-3 py-1.5 rounded hover:bg-brand-light flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Expense
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExpensesCSV}
+              className="bg-dark-surface border border-dark-border text-white text-[10px] uppercase px-3 py-1.5 rounded hover:bg-dark-hoverBg flex items-center gap-1 transition-colors font-bold"
+            >
+              <Download className="w-3.5 h-3.5" /> Export CSV
+            </button>
+            <button
+              onClick={() => setIsExpenseModalOpen(true)}
+              className="bg-brand text-black font-bold text-[10px] uppercase px-3 py-1.5 rounded hover:bg-brand-light flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Expense
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -2161,11 +2571,77 @@ export const AnalyticsDashboard = () => {
   const utilization = dbMetrics.fleetUtilization || 81;
   const opCost = expMetrics.totalOperationalCost || 34070;
 
+  const handleExportOperationalReport = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFillColor(24, 24, 27); // Dark zinc header
+    doc.rect(0, 0, 210, 40, "F");
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TRANSITOPS OPERATIONS REPORT", 15, 25);
+    
+    doc.setTextColor(82, 82, 91);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Report Generated: ${new Date().toLocaleString()}`, 15, 55);
+    doc.text(`Operational Status: Active`, 15, 62);
+    
+    // Core KPIs
+    doc.setFont("helvetica", "bold");
+    doc.text("KEY PERFORMANCE INDICATORS (KPIs)", 15, 80);
+    doc.line(15, 82, 195, 82);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Fleet Utilization Index:`, 15, 92);
+    doc.text(`${utilization}%`, 150, 92);
+    
+    doc.text(`Total Operational Cost (Fuel + Repairs + Tolls):`, 15, 99);
+    doc.text(`INR ${Number(opCost).toLocaleString()}`, 150, 99);
+    
+    doc.text(`Average Fleet Fuel Efficiency:`, 15, 106);
+    doc.text(`8.4 km/l`, 150, 106);
+    
+    doc.text(`Annualized Yield (ROI):`, 15, 113);
+    doc.text(`14.2%`, 150, 113);
+    
+    // Financials
+    doc.setFont("helvetica", "bold");
+    doc.text("FINANCIAL SUMMARY MATRIX", 15, 130);
+    doc.line(15, 132, 195, 132);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Simulated Monthly Revenue:`, 15, 142);
+    doc.text(`INR 1,240,000`, 150, 142);
+    doc.text(`Simulated Cost Base:`, 15, 149);
+    doc.text(`INR 385,000`, 150, 149);
+    doc.text(`Estimated Net Profit:`, 15, 156);
+    doc.text(`INR 855,000`, 150, 156);
+    
+    doc.line(15, 160, 195, 160);
+    
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text("Report generated by TransitOps portal. Strictly confidential operational audit document.", 15, 180);
+
+    doc.save(`TransitOps_Operations_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="space-y-6 text-theme-text font-mono text-xs">
-      <div>
-        <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Reports & Analytics</h2>
-        <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Operational efficiency, fleet yields, and costs tracking ledger.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold font-mono uppercase tracking-tight text-theme-text">Reports & Analytics</h2>
+          <p className="text-[10px] text-theme-muted mt-1 font-mono font-semibold">Operational efficiency, fleet yields, and costs tracking ledger.</p>
+        </div>
+        <button
+          onClick={handleExportOperationalReport}
+          className="bg-brand text-black font-bold font-mono text-xs uppercase px-4 py-2 rounded shadow hover:bg-brand-light flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto"
+        >
+          <FileText className="w-4 h-4" /> Export Report (PDF)
+        </button>
       </div>
 
       {/* Grid of stats */}

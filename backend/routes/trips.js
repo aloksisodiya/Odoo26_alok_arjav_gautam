@@ -144,13 +144,46 @@ router.put('/:id/status', protect, authorize('Driver'), async (req, res) => {
 
     // Perform transitions
     if (status === 'Completed') {
-      // Vehicle back to Available, add odometer
+      // Vehicle back to Available or InShop if threshold crossed, add odometer
       if (trip.vehicleId) {
         const vehicle = await Vehicle.findById(trip.vehicleId);
         if (vehicle) {
-          vehicle.odometerKm = (vehicle.odometerKm || 0) + (trip.plannedDistanceKm || 0);
-          vehicle.status = 'Available';
-          await vehicle.save();
+          const oldOdo = vehicle.odometerKm || 0;
+          const distance = trip.plannedDistanceKm || 0;
+          const newOdo = oldOdo + distance;
+          vehicle.odometerKm = newOdo;
+
+          // Check if odometer has crossed a multiple of 10,000 km
+          const oldMultiple = Math.floor(oldOdo / 10000);
+          const newMultiple = Math.floor(newOdo / 10000);
+          const triggersMaintenance = newMultiple > oldMultiple;
+
+          if (triggersMaintenance) {
+            vehicle.status = 'InShop'; // Automatically switch its status to "In Shop"
+            await vehicle.save();
+
+            // Auto-create active maintenance record
+            const Maintenance = require('../models/Maintenance');
+            await Maintenance.create({
+              vehicleId: vehicle._id,
+              serviceType: 'Scheduled Maintenance (Odometer Triggered)',
+              cost: 0,
+              date: new Date(),
+              status: 'Active'
+            });
+
+            // Auto-create High Alert
+            const Alert = require('../models/Alert');
+            await Alert.create({
+              vehicleId: vehicle._id,
+              type: 'Maintenance',
+              severity: 'High',
+              message: `Vehicle ${vehicle.registrationNo} has crossed a 10,000 km mileage threshold (reached ${newOdo} km). Scheduled Maintenance order generated automatically.`
+            });
+          } else {
+            vehicle.status = 'Available';
+            await vehicle.save();
+          }
         }
       }
       // Driver back to Available
