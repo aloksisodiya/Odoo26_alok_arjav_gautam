@@ -136,48 +136,58 @@ const DashboardLayout = ({ children }) => {
 
   // Navigation Links for all operational modules
   const getNavLinks = () => {
-    return [
+    const allLinks = [
       {
         name: "Dashboard",
         path: "/dashboard",
         icon: LayoutDashboard,
+        roles: ["Driver", "Admin"]
       },
       {
         name: "Fleet",
         path: "/fleet",
         icon: Truck,
+        roles: ["FleetManager", "Admin"]
       },
       {
         name: "Drivers",
         path: "/drivers",
         icon: Users,
+        roles: ["SafetyOfficer", "Admin"]
       },
       {
         name: "Trips",
         path: "/trips",
         icon: Compass,
+        roles: ["Driver", "Admin"]
       },
       {
         name: "Maintenance",
         path: "/maintenance",
         icon: Wrench,
+        roles: ["FleetManager", "Admin"]
       },
       {
         name: "Fuel & Expenses",
         path: "/expenses",
         icon: DollarSign,
+        roles: ["FinancialAnalyst", "Admin"]
       },
       {
         name: "Analytics",
         path: "/analytics",
         icon: BarChart3,
+        roles: ["FinancialAnalyst", "Admin"]
       },
       {
         name: "Settings",
         path: "/settings",
         icon: SettingsIcon,
+        roles: ["FleetManager", "Driver", "SafetyOfficer", "FinancialAnalyst", "Admin"]
       },
     ];
+
+    return allLinks.filter(link => !link.roles || link.roles.includes(user?.role));
   };
 
   const navLinks = getNavLinks();

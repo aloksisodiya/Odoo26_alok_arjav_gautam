@@ -4,6 +4,9 @@ const User = require("./models/User");
 const Vehicle = require("./models/Vehicle");
 const Driver = require("./models/Driver");
 const Trip = require("./models/Trip");
+const Maintenance = require("./models/Maintenance");
+const FuelLog = require("./models/FuelLog");
+const Expense = require("./models/Expense");
 
 const seedUsers = [
   {
@@ -13,10 +16,10 @@ const seedUsers = [
     role: 'FleetManager',
   },
   {
-    name: 'Arjav Dispatcher',
-    email: 'dispatcher@transitops.com',
+    name: 'Arjav Driver',
+    email: 'driver@transitops.com',
     password: 'Password123',
-    role: 'Dispatcher',
+    role: 'Driver',
   },
   {
     name: 'Gautam Safety Officer',
@@ -29,6 +32,12 @@ const seedUsers = [
     email: 'analyst@transitops.com',
     password: 'Password123',
     role: 'FinancialAnalyst',
+  },
+  {
+    name: 'Admin TransitOps',
+    email: 'admin@transitops.com',
+    password: 'Password123',
+    role: 'Admin',
   }
 ];
 
@@ -60,6 +69,9 @@ const runSeed = async () => {
     await Vehicle.deleteMany({});
     await Driver.deleteMany({});
     await Trip.deleteMany({});
+    await Maintenance.deleteMany({});
+    await FuelLog.deleteMany({});
+    await Expense.deleteMany({});
 
     console.log("Creating seed users...");
     for (const u of seedUsers) {
@@ -137,10 +149,95 @@ const runSeed = async () => {
     ];
 
     console.log("Creating seed trips...");
+    const createdTrips = [];
     for (const t of seedTrips) {
-      await Trip.create(t);
+      const created = await Trip.create(t);
+      createdTrips.push(created);
     }
     console.log("Seed trips created successfully.");
+
+    // 1. Create Maintenance seeds
+    console.log("Creating seed maintenance...");
+    if (van) {
+      await Maintenance.create({
+        vehicleId: van._id,
+        serviceType: 'Oil Change',
+        cost: 2500,
+        date: new Date('2026-07-05'),
+        status: 'Active'
+      });
+    }
+    if (trk) {
+      await Maintenance.create({
+        vehicleId: trk._id,
+        serviceType: 'Engine Repair',
+        cost: 18000,
+        date: new Date('2026-07-06'),
+        status: 'Completed'
+      });
+    }
+    if (mini) {
+      await Maintenance.create({
+        vehicleId: mini._id,
+        serviceType: 'Tyre Replace',
+        cost: 6200,
+        date: new Date('2026-07-06'),
+        status: 'Active'
+      });
+    }
+
+    // 2. Create FuelLog seeds
+    console.log("Creating seed fuel logs...");
+    if (van) {
+      await FuelLog.create({
+        vehicleId: van._id,
+        date: new Date('2026-07-05'),
+        liters: 42,
+        cost: 3150
+      });
+    }
+    if (trk) {
+      await FuelLog.create({
+        vehicleId: trk._id,
+        date: new Date('2026-07-06'),
+        liters: 110,
+        cost: 8400
+      });
+    }
+    if (mini) {
+      await FuelLog.create({
+        vehicleId: mini._id,
+        date: new Date('2026-07-06'),
+        liters: 28,
+        cost: 2050
+      });
+    }
+
+    // 3. Create Expense seeds
+    console.log("Creating seed expenses...");
+    const tr001 = createdTrips.find(t => t.tripId === 'TR001');
+    const tr002 = createdTrips.find(t => t.tripId === 'TR002');
+
+    if (tr001 && van) {
+      await Expense.create({
+        tripId: tr001._id,
+        vehicleId: van._id,
+        toll: 120,
+        other: 0,
+        maintenanceCost: 0,
+        total: 120
+      });
+    }
+    if (tr002 && trk) {
+      await Expense.create({
+        tripId: tr002._id,
+        vehicleId: trk._id,
+        toll: 340,
+        other: 150,
+        maintenanceCost: 18000,
+        total: 18490
+      });
+    }
 
     console.log("Database seeding completed successfully!");
     process.exit(0);

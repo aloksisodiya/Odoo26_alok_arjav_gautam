@@ -25,7 +25,7 @@ const registerSchema = z.object({
     .min(6, { message: "Password must be at least 6 characters long" }),
   role: z.enum([
     "FleetManager",
-    "Dispatcher",
+    "Driver",
     "SafetyOfficer",
     "FinancialAnalyst",
   ]),

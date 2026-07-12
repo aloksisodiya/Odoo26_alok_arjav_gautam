@@ -27,7 +27,7 @@ const UserSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["FleetManager", "Dispatcher", "SafetyOfficer", "FinancialAnalyst"],
+      enum: ["FleetManager", "Driver", "SafetyOfficer", "FinancialAnalyst", "Admin"],
       required: [true, "Please specify a role"],
     },
     failedLoginAttempts: {

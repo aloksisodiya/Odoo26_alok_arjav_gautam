@@ -33,7 +33,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && user.role !== "Admin" && !allowedRoles.includes(user.role)) {
     return (
       <div className="bg-dark-surface border border-red-500/20 p-8 rounded shadow text-center py-16">
         <h3 className="text-xl font-bold text-red-400 font-mono tracking-wider uppercase">
@@ -57,9 +57,11 @@ const AuthRedirect = ({ children }) => {
 
   if (token && user) {
     switch (user.role) {
+      case "Admin":
+        return <Navigate to="/dashboard" replace />;
       case "FleetManager":
         return <Navigate to="/fleet" replace />;
-      case "Dispatcher":
+      case "Driver":
         return <Navigate to="/dashboard" replace />;
       case "SafetyOfficer":
         return <Navigate to="/drivers" replace />;
@@ -134,7 +136,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+              <ProtectedRoute allowedRoles={["Driver"]}>
                 <DashboardLayout>
                   <DispatcherDashboard />
                 </DashboardLayout>
@@ -144,7 +146,7 @@ function App() {
           <Route
             path="/trips"
             element={
-              <ProtectedRoute allowedRoles={["Dispatcher"]}>
+              <ProtectedRoute allowedRoles={["Driver"]}>
                 <DashboardLayout>
                   <TripsManager />
                 </DashboardLayout>
