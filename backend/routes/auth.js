@@ -78,8 +78,9 @@ router.post("/login", async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    // Verify selected role matches user role
-    if (role && user.role !== role) {
+    // Verify selected role matches user role (normalize Driver and Dispatcher for cross-compatibility)
+    const checkRole = role === "Driver" ? "Dispatcher" : role;
+    if (checkRole && user.role !== checkRole) {
       return res.status(401).json({
         success: false,
         message: `Role mismatch. Your account is registered as '${user.role}' not '${role}'`,
@@ -167,11 +168,12 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    const dbRole = role === "Driver" ? "Dispatcher" : role;
     const user = await User.create({
       name,
       email,
       password,
-      role,
+      role: dbRole,
     });
 
     res.status(201).json({
