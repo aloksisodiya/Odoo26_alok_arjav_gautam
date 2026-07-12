@@ -30,7 +30,7 @@ const Login = () => {
         setEmail("fleet@transitops.com");
         setPassword("Password123");
         break;
-      case "Driver":
+      case "Dispatcher":
         setEmail("driver@transitops.com");
         setPassword("Password123");
         break;
@@ -68,7 +68,7 @@ const Login = () => {
         case "FleetManager":
           navigate("/fleet");
           break;
-        case "Driver":
+        case "Dispatcher":
           navigate("/dashboard");
           break;
         case "SafetyOfficer":
@@ -116,10 +116,9 @@ const Login = () => {
               {[
                 { name: "Admin", desc: "Full system access" },
                 { name: "Fleet Manager", desc: "Registry & Maintenance" },
-                { name: "Driver", desc: "Creates trips, assigns assets, monitors active deliveries" },
+                { name: "Dispatcher", desc: "Creates trips, assigns assets, monitors active deliveries" },
                 { name: "Safety Officer", desc: "Driver safety compliance" },
                 { name: "Financial Analyst", desc: "Expenses & ROI analysis" },
-                { name: "Admin", desc: "Global access to all settings and pages" },
               ].map((item, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand mt-1.5 flex-shrink-0 animate-pulse"></span>
@@ -231,10 +230,9 @@ const Login = () => {
                 >
                   <option value="Admin">Admin</option>
                   <option value="FleetManager">Fleet Manager</option>
-                  <option value="Driver">Driver</option>
+                  <option value="Dispatcher">Dispatcher / Driver</option>
                   <option value="SafetyOfficer">Safety Officer</option>
                   <option value="FinancialAnalyst">Financial Analyst</option>
-                  <option value="Admin">Admin</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
                   ▼
