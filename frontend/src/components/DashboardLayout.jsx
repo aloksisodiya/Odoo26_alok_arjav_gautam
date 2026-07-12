@@ -192,7 +192,7 @@ const DashboardLayout = ({ children }) => {
         name: "Dashboard",
         path: "/dashboard",
         icon: LayoutDashboard,
-        roles: ["Driver", "Admin"]
+        roles: ["Dispatcher", "Driver", "Admin"]
       },
       {
         name: "Fleet",
@@ -210,7 +210,7 @@ const DashboardLayout = ({ children }) => {
         name: "Trips",
         path: "/trips",
         icon: Compass,
-        roles: ["Driver", "Admin"]
+        roles: ["Dispatcher", "Driver", "Admin"]
       },
       {
         name: "Maintenance",
@@ -234,7 +234,7 @@ const DashboardLayout = ({ children }) => {
         name: "Settings",
         path: "/settings",
         icon: SettingsIcon,
-        roles: ["FleetManager", "Driver", "SafetyOfficer", "FinancialAnalyst", "Admin"]
+        roles: ["FleetManager", "Dispatcher", "Driver", "SafetyOfficer", "FinancialAnalyst", "Admin"]
       },
     ];
 
