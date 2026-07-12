@@ -134,76 +134,50 @@ const DashboardLayout = ({ children }) => {
     });
   };
 
-  // Navigation Links filtering based on Role
+  // Navigation Links for all operational modules
   const getNavLinks = () => {
-    const allLinks = [
+    return [
       {
         name: "Dashboard",
         path: "/dashboard",
         icon: LayoutDashboard,
-        roles: ["Dispatcher"],
       },
       {
-        name: "Trips (Trip Dispatcher)",
-        path: "/trips",
-        icon: Compass,
-        roles: ["Dispatcher"],
-      },
-      {
-        name: "Fleet Registry",
+        name: "Fleet",
         path: "/fleet",
         icon: Truck,
-        roles: ["FleetManager"],
       },
       {
-        name: "Maintenance Logs",
-        path: "/maintenance",
-        icon: Wrench,
-        roles: ["FleetManager"],
-      },
-      {
-        name: "Driver Registry",
+        name: "Drivers",
         path: "/drivers",
         icon: Users,
-        roles: ["SafetyOfficer"],
       },
       {
-        name: "Compliance Logs",
-        path: "/compliance",
-        icon: FileCheck,
-        roles: ["SafetyOfficer"],
+        name: "Trips",
+        path: "/trips",
+        icon: Compass,
+      },
+      {
+        name: "Maintenance",
+        path: "/maintenance",
+        icon: Wrench,
       },
       {
         name: "Fuel & Expenses",
         path: "/expenses",
         icon: DollarSign,
-        roles: ["FinancialAnalyst"],
       },
       {
-        name: "Analytics Dashboard",
+        name: "Analytics",
         path: "/analytics",
         icon: BarChart3,
-        roles: ["FinancialAnalyst"],
+      },
+      {
+        name: "Settings",
+        path: "/settings",
+        icon: SettingsIcon,
       },
     ];
-
-    // Filter based on user's role
-    const filtered = allLinks.filter((link) => link.roles.includes(user.role));
-
-    // Add Settings at the bottom (accessible to all, but settings content would check permissions)
-    filtered.push({
-      name: "System Settings",
-      path: "/settings",
-      icon: SettingsIcon,
-      roles: [
-        "FleetManager",
-        "Dispatcher",
-        "SafetyOfficer",
-        "FinancialAnalyst",
-      ],
-    });
-
-    return filtered;
   };
 
   const navLinks = getNavLinks();
